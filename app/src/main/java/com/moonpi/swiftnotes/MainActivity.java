@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -14,6 +15,7 @@ import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -25,16 +27,39 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
+import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.drive.Drive;
+import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFolder;
+import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.DriveResource;
+import com.google.android.gms.drive.Metadata;
+import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.Query;
+import com.google.android.gms.drive.query.SearchableField;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 
 import static com.moonpi.swiftnotes.DataUtils.BACKUP_FILE_NAME;
 import static com.moonpi.swiftnotes.DataUtils.BACKUP_FOLDER_PATH;
 import static com.moonpi.swiftnotes.DataUtils.NEW_NOTE_REQUEST;
+import static com.moonpi.swiftnotes.DataUtils.NOTES_ARRAY_NAME;
 import static com.moonpi.swiftnotes.DataUtils.NOTES_FILE_NAME;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_BODY;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_COLOUR;
@@ -49,11 +74,16 @@ import static com.moonpi.swiftnotes.DataUtils.isExternalStorageWritable;
 import static com.moonpi.swiftnotes.DataUtils.retrieveData;
 import static com.moonpi.swiftnotes.DataUtils.saveData;
 
-
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener,
         Toolbar.OnMenuItemClickListener, AbsListView.MultiChoiceModeListener,
-        SearchView.OnQueryTextListener {
+        SearchView.OnQueryTextListener, ConnectionCallbacks, OnConnectionFailedListener {
 
+    // Google Drive stuff
+    private GoogleApiClient mGoogleApiClient;
+    private static final int REQUEST_CODE_RESOLUTION = 3;
+    private static final String CLOUD_BACKUP_PATH = "swiftnotes_data.json";
+
+    private static final String TAG = "swiftnotes";
     private static File localPath, backupPath;
 
     // Layout components
@@ -77,7 +107,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private int lastFirstVisibleItem = -1; // Last first item seen in list view scroll changed
     private float newNoteButtonBaseYCoordinate; // Base Y coordinate of newNote button
 
-    private AlertDialog backupCheckDialog, backupOKDialog, restoreCheckDialog, restoreFailedDialog;
+    private AlertDialog cloudBackupCheckDialog, backupCheckDialog, cloudBackupOKDialog,
+                        backupOKDialog, restoreCheckDialog, restoreFailedDialog;
 
 
     @Override
@@ -295,6 +326,47 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
+        cloudBackupCheckDialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.action_cloud_backup)
+                .setMessage(R.string.dialog_check_backup_if_sure)
+                .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // If note array not empty -> continue
+                        if (notes.length() > 0) {
+                            boolean backupSuccessful = saveDataToCloud(notes);
+
+                            // This has to be done in a callback function
+                            /*
+                            if (backupSuccessful)
+                                showCloudBackupSuccessfulDialog();
+
+                            else {
+                                Toast toast = Toast.makeText(getApplicationContext(),
+                                        getResources().getString(R.string.toast_backup_failed),
+                                        Toast.LENGTH_SHORT);
+                                toast.show();
+                            }
+                            */
+                        }
+
+                        // If notes array is empty -> toast backup no notes found
+                        else {
+                            Toast toast = Toast.makeText(getApplicationContext(),
+                                    getResources().getString(R.string.toast_backup_no_notes),
+                                    Toast.LENGTH_SHORT);
+                            toast.show();
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .create();
+
 
         // Dialog to display backup was successfully created in backupPath
         backupOKDialog = new AlertDialog.Builder(context)
@@ -308,7 +380,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
                 })
                 .create();
-
+        // Dialog to display backup was successfully uploaded to Gdrive
+        cloudBackupOKDialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.dialog_backup_created_title)
+                .setMessage(getString(R.string.dialog_cloud_backup_created))
+                .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .create();
 
         /*
          * Restore check dialog
@@ -390,6 +472,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         backupOKDialog.show();
     }
 
+    // Method to dismiss backup check and show backup successful dialog
+    protected void showCloudBackupSuccessfulDialog() {
+        cloudBackupCheckDialog.dismiss();
+        cloudBackupOKDialog.show();
+    }
+
     // Method to dismiss restore check and show restore failed dialog
     protected void showRestoreFailedDialog() {
         restoreCheckDialog.dismiss();
@@ -467,6 +555,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public boolean onMenuItemClick(MenuItem menuItem) {
         int id = menuItem.getItemId();
+
+        if (id == R.id.action_cloud_backup) {
+            cloudBackupCheckDialog.show();
+            return true;
+        }
 
         // 'Backup notes' pressed -> show backupCheckDialog
         if (id == R.id.action_backup) {
@@ -953,6 +1046,118 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
+    /*
+        Trash old backups.
+     */
+    private void trashOldCloudBackups(final DriveId currentDriveId) {
+        Query query = new Query.Builder()
+                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_PATH))
+                .build();
+        Drive.DriveApi.query(mGoogleApiClient, query)
+                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
+                    @Override
+                    public void onResult(DriveApi.MetadataBufferResult result) {
+                        // Iterate over the matching Metadata instances in mdResultSet
+                        for (Metadata md : result.getMetadataBuffer()) {
+                            DriveId did = md.getDriveId();
+                            if (!did.equals(currentDriveId)) {
+                                DriveResource driveResource = did.asDriveResource();
+                                if (!md.isTrashed()) {
+                                    driveResource.trash(mGoogleApiClient);
+                                }
+                            }
+                        }
+                        Log.i(TAG, "Trashed old backups.");
+                    }
+                });
+    }
+
+    /*
+        Upload file to Google Drive with contents in str, title as title, mimetype as mimetype.
+     */
+    private void uploadFile(final DriveContents driveContents, String str, String title, String mimetype) {
+        OutputStream outputStream = driveContents.getOutputStream();
+        Writer writer = new OutputStreamWriter(outputStream);
+        try {
+            writer.write(str);
+            writer.close();
+        } catch (IOException e) {
+            Log.e(TAG, e.getMessage());
+        }
+        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                .setTitle(title)
+                .setMimeType(mimetype)
+                .setStarred(false).build();
+
+        // create a file on root folder
+        Drive.DriveApi.getRootFolder(mGoogleApiClient)
+                .createFile(mGoogleApiClient, changeSet, driveContents)
+                .setResultCallback(fileCallback);
+    }
+
+    /**
+     * Wrap 'notes' array into a root object and store on Google Drive
+     * @param notes Array of notes to be saved
+     * @return true if successfully saved, false otherwise
+     */
+    boolean saveDataToCloud(JSONArray notes) {
+        final JSONObject root = new JSONObject();
+
+        // If passed notes not null -> wrap in root JSONObject
+        if (notes != null) {
+            try {
+                root.put(NOTES_ARRAY_NAME, notes);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                return false;
+            }
+        } else {
+            return false; // If passed notes null -> return false
+        }
+
+        Drive.DriveApi.newDriveContents(mGoogleApiClient)
+                .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
+
+                    @Override
+                    public void onResult(DriveApi.DriveContentsResult result) {
+                        // If the operation was not successful, we cannot do anything
+                        // and must fail.
+                        if (!result.getStatus().isSuccess()) {
+                            Log.i(TAG, "Failed to create new contents.");
+                            return;
+                        }
+                        // Otherwise, we can write our data to the new contents.
+                        Log.i(TAG, "New contents created.");
+                        final DriveContents driveContents = result.getDriveContents();
+                        uploadFile(driveContents, root.toString(), CLOUD_BACKUP_PATH, "application/json");
+                    }
+                });
+
+        return true;
+    }
+
+    /*
+        Callback for when a file has been uploaded.
+     */
+    final private ResultCallback<DriveFolder.DriveFileResult> fileCallback = new
+            ResultCallback<DriveFolder.DriveFileResult>() {
+        @Override
+        public void onResult(DriveFolder.DriveFileResult result) {
+            if (!result.getStatus().isSuccess()) {
+                Log.i(TAG, "Error while trying to create the file");
+                Toast toast = Toast.makeText(getApplicationContext(),
+                        getResources().getString(R.string.toast_backup_failed),
+                        Toast.LENGTH_SHORT);
+                toast.show();
+                return;
+            }
+            DriveId currentDriveId = result.getDriveFile().getDriveId();
+            Log.i(TAG, "Created a file with content: " + currentDriveId);
+
+            showCloudBackupSuccessfulDialog();
+            trashOldCloudBackups(currentDriveId);
+        }
+    };
 
     /**
      * If back button pressed while search is active -> collapse view and end search mode
@@ -967,7 +1172,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onBackPressed();
     }
 
-
     /**
      * Orientation changed callback method
      * If orientation changed -> If any AlertDialog is showing, dismiss it to prevent WindowLeaks
@@ -978,8 +1182,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (backupCheckDialog != null && backupCheckDialog.isShowing())
             backupCheckDialog.dismiss();
 
+        if (cloudBackupCheckDialog != null && cloudBackupCheckDialog.isShowing())
+            cloudBackupCheckDialog.dismiss();
+
         if (backupOKDialog != null && backupOKDialog.isShowing())
             backupOKDialog.dismiss();
+
+        if (cloudBackupOKDialog != null && cloudBackupOKDialog.isShowing())
+            cloudBackupOKDialog.dismiss();
 
         if (restoreCheckDialog != null && restoreCheckDialog.isShowing())
             restoreCheckDialog.dismiss();
@@ -990,7 +1200,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onConfigurationChanged(newConfig);
     }
 
-
     // Static method to return File at localPath
     public static File getLocalPath() {
         return localPath;
@@ -1000,4 +1209,64 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public static File getBackupPath() {
         return backupPath;
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (mGoogleApiClient == null) {
+            // Create the API client and bind it to an instance variable.
+            // We use this instance as the callback for connection and connection
+            // failures.
+            // Since no account name is passed, the user is prompted to choose.
+            mGoogleApiClient = new GoogleApiClient.Builder(this)
+                    .addApi(Drive.API)
+                    .addScope(Drive.SCOPE_FILE)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .build();
+        }
+        // Connect the client. Once connected, onConnected() is called.
+        Log.i(TAG, "Connect GoogleApiClient");
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    protected void onPause() {
+        if (mGoogleApiClient != null) {
+            mGoogleApiClient.disconnect();
+        }
+        super.onPause();
+    }
+
+    @Override
+    public void onConnectionSuspended(int cause) {
+        Log.i(TAG, "GoogleApiClient connection suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult result) {
+        // Called whenever the API client fails to connect.
+        Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
+        if (!result.hasResolution()) {
+            // show the localized error dialog.
+            GoogleApiAvailability.getInstance().getErrorDialog(this, result.getErrorCode(), 0).show();
+            return;
+        }
+        // The failure has a resolution. Resolve it.
+        // Called typically when the app is not yet authorized, and an
+        // authorization
+        // dialog is displayed to the user.
+        try {
+            result.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
+        } catch (IntentSender.SendIntentException e) {
+            Log.e(TAG, "Exception while starting resolution activity", e);
+        }
+
+    }
+
+    @Override
+    public void onConnected(Bundle connectionHint) {
+        Log.i(TAG, "API client connected.");
+    }
+
 }

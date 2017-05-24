@@ -31,6 +31,7 @@
     <!-- -->
     <string name="action_search">Search</string>
     <string name="action_rate_app">Rate app</string>
+    <string name="action_cloud_backup">Backup notes to GDrive</string>
     <string name="action_backup">Backup notes</string>
     <string name="action_restore">Restore notes</string>
     <string name="action_note_colour">Note colour</string>
@@ -50,6 +51,7 @@
     <string name="dialog_check_backup_if_sure">Are you sure you want to backup current notes?</string>
     <string name="dialog_backup_created_title">Backup successful</string>
     <string name="dialog_backup_created">Backup created in</string>
+    <string name="dialog_cloud_backup_created">Backup uploaded to Google Drive</string>
     <string name="dialog_check_restore_if_sure">Are you sure you want to restore backup notes?
         (Cannot be undone)</string>
     <string name="dialog_restore_failed_title">No backup found</string>

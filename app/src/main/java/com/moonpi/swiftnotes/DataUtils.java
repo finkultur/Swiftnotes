@@ -35,7 +35,7 @@ import static com.moonpi.swiftnotes.MainActivity.*;
 class DataUtils {
 
     static final String NOTES_FILE_NAME = "notes.json"; // Local notes file name
-    private static final String NOTES_ARRAY_NAME = "notes"; // Root object name
+    static final String NOTES_ARRAY_NAME = "notes"; // Root object name
 
     static final String BACKUP_FOLDER_PATH = "/Swiftnotes"; // Backup folder path
     static final String BACKUP_FILE_NAME = "swiftnotes_backup.json"; // Backup file name
@@ -146,7 +146,6 @@ class DataUtils {
 
         return successful;
     }
-
 
     /**
      * Read from file 'fromFile' and return parsed JSONArray of notes
