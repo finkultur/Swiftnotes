@@ -1,6 +1,7 @@
 package com.moonpi.swiftnotes;
 
 import android.os.Environment;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -69,13 +70,16 @@ class DataUtils {
 
             } catch (JSONException e) {
                 e.printStackTrace();
+                Log.i("saveData", "JSONException");
                 return false;
             }
         }
 
         // If passed notes null -> return false
-        else
+        else {
+            Log.i("saveData", "Passed notes null");
             return false;
+        }
 
         // If file is backup and it doesn't exist -> create file
         if (toFile == getBackupPath()) {
@@ -107,6 +111,7 @@ class DataUtils {
 
                 // If file failed to create -> return false
                 if (!created)
+                    Log.i("saveData", "Failed to create File");
                     return false;
 
             } catch (IOException e) {

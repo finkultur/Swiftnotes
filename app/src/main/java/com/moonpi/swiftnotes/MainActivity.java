@@ -36,6 +36,7 @@ import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.DriveResource;
@@ -49,8 +50,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -81,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Google Drive stuff
     private GoogleApiClient mGoogleApiClient;
     private static final int REQUEST_CODE_RESOLUTION = 3;
-    private static final String CLOUD_BACKUP_PATH = "swiftnotes_data.json";
+    private static final String CLOUD_BACKUP_FILENAME = "swiftnotes_data.json";
 
     private static final String TAG = "swiftnotes";
     private static File localPath, backupPath;
@@ -108,7 +111,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private float newNoteButtonBaseYCoordinate; // Base Y coordinate of newNote button
 
     private AlertDialog cloudBackupCheckDialog, backupCheckDialog, cloudBackupOKDialog,
-                        backupOKDialog, restoreCheckDialog, restoreFailedDialog;
+                        backupOKDialog, cloudRestoreCheckDialog, restoreCheckDialog,
+                        cloudRestoreFailedDialog,restoreFailedDialog;
 
 
     @Override
@@ -452,6 +456,62 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
+        cloudRestoreCheckDialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.action_restore)
+                .setMessage(R.string.dialog_check_restore_if_sure)
+                .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        //JSONArray tempNotes = retrieveData(backupPath);
+                        getCloudBackup();
+                        /* TODO: Do this in callback
+                        // If backup file exists -> copy backup notes to local file
+                        if (tempNotes != null) {
+                            boolean restoreSuccessful = saveData(localPath, tempNotes);
+
+                            if (restoreSuccessful) {
+                                notes = tempNotes;
+
+                                adapter = new NoteAdapter(getApplicationContext(), notes);
+                                listView.setAdapter(adapter);
+
+                                Toast toast = Toast.makeText(getApplicationContext(),
+                                        getResources().getString(R.string.toast_restore_successful),
+                                        Toast.LENGTH_SHORT);
+                                toast.show();
+
+                                // If no notes -> show 'Press + to add new note' text, invisible otherwise
+                                if (notes.length() == 0)
+                                    noNotes.setVisibility(View.VISIBLE);
+
+                                else
+                                    noNotes.setVisibility(View.INVISIBLE);
+                            }
+
+                            // If restore unsuccessful -> toast restore unsuccessful
+                            else {
+                                Toast toast = Toast.makeText(getApplicationContext(),
+                                        getResources().getString(R.string.toast_restore_unsuccessful),
+                                        Toast.LENGTH_SHORT);
+                                toast.show();
+                            }
+                        }
+
+                        // If backup file doesn't exist -> show restore failed dialog
+                        else {
+                            showRestoreFailedDialog();
+                        }
+                        */
+                    }
+                })
+                .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .create();
+
 
         // Dialog to display restore failed when no backup file found
         restoreFailedDialog = new AlertDialog.Builder(context)
@@ -565,6 +625,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (id == R.id.action_backup) {
             backupCheckDialog.show();
             return true;
+        }
+
+        if (id == R.id.action_cloud_restore) {
+            cloudRestoreCheckDialog.show();
         }
 
         // 'Restore notes' pressed -> show restoreCheckDialog
@@ -1051,7 +1115,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      */
     private void trashOldCloudBackups(final DriveId currentDriveId) {
         Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_PATH))
+                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_FILENAME))
                 .build();
         Drive.DriveApi.query(mGoogleApiClient, query)
                 .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
@@ -1070,6 +1134,101 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         Log.i(TAG, "Trashed old backups.");
                     }
                 });
+    }
+
+    /*
+        Clusterfuck of nested callbacks
+     */
+    private void getCloudBackup() {
+        Query query = new Query.Builder()
+                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_FILENAME))
+                .build();
+        Log.i(TAG, "Lets get cloud backup from GDrive");
+        Drive.DriveApi.query(mGoogleApiClient, query)
+                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
+                    @Override
+                    public void onResult(DriveApi.MetadataBufferResult result) {
+                        if (!result.getStatus().isSuccess()) {
+                            // Error
+                            Log.e(TAG, "Something went wrong");
+                            return;
+                        }
+                        DriveId did = result.getMetadataBuffer().get(0).getDriveId();
+                        DriveFile driveFile = did.asDriveFile();
+                        driveFile.open(mGoogleApiClient, DriveFile.MODE_READ_ONLY, null)
+                                .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
+                            @Override
+                            public void onResult(DriveApi.DriveContentsResult result) {
+                                if (!result.getStatus().isSuccess()) {
+                                    Log.e(TAG, "Something went wrong #2");
+                                    return;
+                                }
+                                Log.i(TAG, "Retrieved backup.");
+                                restoreBackup(result.getDriveContents());
+                            }
+                          });
+                    }
+                });
+    }
+
+    private void restoreBackup(DriveContents driveContents) {
+        JSONObject root = null;
+        JSONArray tempNotes = null;
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(driveContents.getInputStream()));
+
+        try {
+            String line;
+            StringBuilder builder = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            root = new JSONObject(builder.toString());
+        } catch (IOException e) {
+            Log.e(TAG, "IOException while reading from the stream", e);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                reader.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // If root is not null -> get notes array from root object
+        if (root != null) {
+            try {
+                tempNotes = root.getJSONArray(NOTES_ARRAY_NAME);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+
+        Log.i(TAG, "Got some data.");
+
+        boolean restoreSuccessful = saveData(localPath, tempNotes);
+        if (restoreSuccessful) {
+            Log.i(TAG, "restore successful");
+            notes = tempNotes;
+
+            adapter = new NoteAdapter(getApplicationContext(), notes);
+            listView.setAdapter(adapter);
+
+            Toast toast = Toast.makeText(getApplicationContext(),
+                    getResources().getString(R.string.toast_restore_successful),
+                    Toast.LENGTH_SHORT);
+            toast.show();
+
+            // If no notes -> show 'Press + to add new note' text, invisible otherwise
+            if (notes.length() == 0)
+                noNotes.setVisibility(View.VISIBLE);
+
+            else
+                noNotes.setVisibility(View.INVISIBLE);
+        } else {
+            Log.i(TAG, "restore unsuccessful");
+        }
     }
 
     /*
@@ -1129,7 +1288,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         // Otherwise, we can write our data to the new contents.
                         Log.i(TAG, "New contents created.");
                         final DriveContents driveContents = result.getDriveContents();
-                        uploadFile(driveContents, root.toString(), CLOUD_BACKUP_PATH, "application/json");
+                        uploadFile(driveContents, root.toString(), CLOUD_BACKUP_FILENAME, "application/json");
                     }
                 });
 
