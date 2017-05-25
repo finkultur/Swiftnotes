@@ -54,6 +54,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -72,11 +73,6 @@ import static com.moonpi.swiftnotes.DataUtils.NOTE_FONT_SIZE;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_HIDE_BODY;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_REQUEST_CODE;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_TITLE;
-import static com.moonpi.swiftnotes.DataUtils.deleteNotes;
-import static com.moonpi.swiftnotes.DataUtils.isExternalStorageReadable;
-import static com.moonpi.swiftnotes.DataUtils.isExternalStorageWritable;
-import static com.moonpi.swiftnotes.DataUtils.retrieveData;
-import static com.moonpi.swiftnotes.DataUtils.saveData;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener,
         Toolbar.OnMenuItemClickListener, AbsListView.MultiChoiceModeListener,
@@ -123,7 +119,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         File backupFolder = new File(Environment.getExternalStorageDirectory() + BACKUP_FOLDER_PATH);
 
-        if (isExternalStorageReadable() && isExternalStorageWritable() && !backupFolder.exists())
+        if (DataUtils.isExternalStorageReadable()
+                && DataUtils.isExternalStorageWritable()
+                && !backupFolder.exists())
             backupFolder.mkdir();
 
         backupPath = new File(backupFolder, BACKUP_FILE_NAME);
@@ -140,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         notes = new JSONArray();
 
         // Retrieve from local path
-        JSONArray tempNotes = retrieveData(localPath);
+        JSONArray tempNotes = DataUtils.retrieveData(localPath);
 
         // If not null -> equal main notes to retrieved notes
         if (tempNotes != null)
@@ -296,7 +294,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            boolean backupSuccessful = saveData(backupPath, notes);
+                            boolean backupSuccessful = DataUtils.saveData(backupPath, notes);
 
                             if (backupSuccessful) {
                                 showBackupSuccessfulDialog();
@@ -384,11 +382,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        JSONArray tempNotes = retrieveData(backupPath);
+                        JSONArray tempNotes = DataUtils.retrieveData(backupPath);
 
                         // If backup file exists -> copy backup notes to local file
                         if (tempNotes != null) {
-                            boolean restoreSuccessful = saveData(localPath, tempNotes);
+                            boolean restoreSuccessful = DataUtils.saveData(localPath, tempNotes);
 
                             if (restoreSuccessful) {
                                 notes = tempNotes;
@@ -660,14 +658,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
                             // Pass notes and checked items for deletion array to 'deleteNotes'
-                            notes = deleteNotes(notes, checkedArray);
+                            notes = DataUtils.deleteNotes(notes, checkedArray);
 
                             // Create and set new adapter with new notes array
                             adapter = new NoteAdapter(getApplicationContext(), notes);
                             listView.setAdapter(adapter);
 
                             // Attempt to save notes to local file
-                            Boolean saveSuccessful = saveData(localPath, notes);
+                            Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
 
                             // If save successful -> toast successfully deleted
                             if (saveSuccessful) {
@@ -868,7 +866,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     // If newNoteObject not null -> save notes array to local file and notify adapter
                     adapter.notifyDataSetChanged();
 
-                    Boolean saveSuccessful = saveData(localPath, notes);
+                    Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
 
                     if (saveSuccessful) {
                         Toast toast = Toast.makeText(getApplicationContext(),
@@ -908,7 +906,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     if (newNoteObject != null) {
                         adapter.notifyDataSetChanged();
 
-                        Boolean saveSuccessful = saveData(localPath, notes);
+                        Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
 
                         if (saveSuccessful) {
                             Toast toast = Toast.makeText(getApplicationContext(),
@@ -1031,7 +1029,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
 
             // Save notes to local file
-            saveData(localPath, notes);
+            DataUtils.saveData(localPath, notes);
         }
     }
 
@@ -1056,6 +1054,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                                 }
                             }
                         }
+                        result.release();
+
                         Log.i(TAG, "Trashed old backups.");
                     }
                 });
@@ -1091,7 +1091,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                                     return;
                                 }
                                 Log.i(TAG, "Retrieved backup.");
-                                restoreBackup(result.getDriveContents());
+                                restoreBackup(result.getDriveContents().getInputStream());
                             }
                           });
                     }
@@ -1099,14 +1099,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     /*
-        Restores a backup from Google Drive.
+        Restores a backup from InputStream is.
         Called from getCloudBackup().
+        @param is InputStream, presumably from DriveContents.getInputstream()
      */
-    private void restoreBackup(DriveContents driveContents) {
+    private void restoreBackup(InputStream is) {
         JSONObject root = null;
         JSONArray tempNotes = null;
-        BufferedReader reader = new BufferedReader(
-                new InputStreamReader(driveContents.getInputStream()));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 
         try {
             String line;
@@ -1136,7 +1136,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         }
 
-        boolean restoreSuccessful = saveData(localPath, tempNotes);
+        boolean restoreSuccessful = DataUtils.saveData(localPath, tempNotes);
         if (restoreSuccessful) {
             Log.i(TAG, "restore successful");
             notes = tempNotes;
