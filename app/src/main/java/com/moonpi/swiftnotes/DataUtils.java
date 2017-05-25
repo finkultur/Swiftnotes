@@ -1,7 +1,6 @@
 package com.moonpi.swiftnotes;
 
 import android.os.Environment;
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -15,7 +14,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import static com.moonpi.swiftnotes.MainActivity.*;
+import static com.moonpi.swiftnotes.MainActivity.getBackupPath;
+import static com.moonpi.swiftnotes.MainActivity.getLocalPath;
 
     /*
     *   JSON file structure:
@@ -51,7 +51,6 @@ class DataUtils {
     static final String NOTE_FONT_SIZE = "fontSize";
     static final String NOTE_HIDE_BODY = "hideBody";
 
-
     /**
      * Wrap 'notes' array into a root object and store in file 'toFile'
      * @param toFile File to store notes into
@@ -70,14 +69,12 @@ class DataUtils {
 
             } catch (JSONException e) {
                 e.printStackTrace();
-                Log.i("saveData", "JSONException");
                 return false;
             }
         }
 
         // If passed notes null -> return false
         else {
-            Log.i("saveData", "Passed notes null");
             return false;
         }
 
@@ -111,7 +108,6 @@ class DataUtils {
 
                 // If file failed to create -> return false
                 if (!created)
-                    Log.i("saveData", "Failed to create File");
                     return false;
 
             } catch (IOException e) {

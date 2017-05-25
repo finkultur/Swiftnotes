@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.NonNull;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
@@ -81,13 +82,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Toolbar.OnMenuItemClickListener, AbsListView.MultiChoiceModeListener,
         SearchView.OnQueryTextListener, ConnectionCallbacks, OnConnectionFailedListener {
 
+    private static final String TAG = "swiftnotes";
+    private static File localPath, backupPath;
+
     // Google Drive stuff
     private GoogleApiClient mGoogleApiClient;
     private static final int REQUEST_CODE_RESOLUTION = 3;
-    private static final String CLOUD_BACKUP_FILENAME = "swiftnotes_data.json";
-
-    private static final String TAG = "swiftnotes";
-    private static File localPath, backupPath;
 
     // Layout components
     private static ListView listView;
@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private static NoteAdapter adapter; // Custom ListView notes adapter
 
     // Array of selected positions for deletion
-    public static ArrayList<Integer> checkedArray = new ArrayList<Integer>();
+    public static ArrayList<Integer> checkedArray = new ArrayList<>();
     public static boolean deleteActive = false; // True if delete mode is active, false otherwise
 
     // For disabling long clicks, favourite clicks and modifying the item click pattern
@@ -112,8 +112,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private AlertDialog cloudBackupCheckDialog, backupCheckDialog, cloudBackupOKDialog,
                         backupOKDialog, cloudRestoreCheckDialog, restoreCheckDialog,
-                        cloudRestoreFailedDialog,restoreFailedDialog;
-
+                        cloudRestoreFailedDialog, restoreFailedDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,8 +121,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Initialize local file path and backup file path
         localPath = new File(getFilesDir() + "/" + NOTES_FILE_NAME);
 
-        File backupFolder = new File(Environment.getExternalStorageDirectory() +
-                BACKUP_FOLDER_PATH);
+        File backupFolder = new File(Environment.getExternalStorageDirectory() + BACKUP_FOLDER_PATH);
 
         if (isExternalStorageReadable() && isExternalStorageWritable() && !backupFolder.exists())
             backupFolder.mkdir();
@@ -219,12 +217,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         initDialogs(this);
     }
 
-
     /**
      * Initialize toolbar with required components such as
      * - title, menu/OnMenuItemClickListener and searchView -
      */
-    protected void initToolbar() {
+    private void initToolbar() {
         toolbar.setTitle(R.string.app_name);
 
         // Inflate menu_main to be displayed in the toolbar
@@ -259,7 +256,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             listView.setLongClickable(false);
 
                             // Init realIndexes array
-                            realIndexesOfSearchResults = new ArrayList<Integer>();
+                            realIndexesOfSearchResults = new ArrayList<>();
                             for (int i = 0; i < notes.length(); i++)
                                 realIndexesOfSearchResults.add(i);
 
@@ -279,13 +276,12 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
-
     /**
      * Implementation of AlertDialogs such as
      * - backupCheckDialog, backupOKDialog, restoreCheckDialog, restoreFailedDialog -
      * @param context The Activity context of the dialogs; in this case MainActivity context
      */
-    protected void initDialogs(Context context) {
+    private void initDialogs(Context context) {
         /*
          * Backup check dialog
          *  If not sure -> dismiss
@@ -302,19 +298,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         if (notes.length() > 0) {
                             boolean backupSuccessful = saveData(backupPath, notes);
 
-                            if (backupSuccessful)
+                            if (backupSuccessful) {
                                 showBackupSuccessfulDialog();
-
-                            else {
+                            } else {
                                 Toast toast = Toast.makeText(getApplicationContext(),
                                         getResources().getString(R.string.toast_backup_failed),
                                         Toast.LENGTH_SHORT);
                                 toast.show();
                             }
-                        }
-
-                        // If notes array is empty -> toast backup no notes found
-                        else {
+                        } else { // If notes array is empty -> toast backup no notes found
                             Toast toast = Toast.makeText(getApplicationContext(),
                                     getResources().getString(R.string.toast_backup_no_notes),
                                     Toast.LENGTH_SHORT);
@@ -338,24 +330,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            boolean backupSuccessful = saveDataToCloud(notes);
-
-                            // This has to be done in a callback function
-                            /*
-                            if (backupSuccessful)
-                                showCloudBackupSuccessfulDialog();
-
-                            else {
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_backup_failed),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
-                            }
-                            */
-                        }
-
-                        // If notes array is empty -> toast backup no notes found
-                        else {
+                            saveDataToCloud(notes);
+                        } else { // If notes array is empty -> toast backup no notes found
                             Toast toast = Toast.makeText(getApplicationContext(),
                                     getResources().getString(R.string.toast_backup_no_notes),
                                     Toast.LENGTH_SHORT);
@@ -371,7 +347,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
-
         // Dialog to display backup was successfully created in backupPath
         backupOKDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.dialog_backup_created_title)
@@ -384,7 +359,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
                 })
                 .create();
-        // Dialog to display backup was successfully uploaded to Gdrive
+        // Dialog to display backup was successfully uploaded to GDrive
         cloudBackupOKDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.dialog_backup_created_title)
                 .setMessage(getString(R.string.dialog_cloud_backup_created))
@@ -427,10 +402,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                                 toast.show();
 
                                 // If no notes -> show 'Press + to add new note' text, invisible otherwise
-                                if (notes.length() == 0)
+                                if (notes.length() == 0) {
                                     noNotes.setVisibility(View.VISIBLE);
-
-                                else
+                                } else
                                     noNotes.setVisibility(View.INVISIBLE);
                             }
 
@@ -462,46 +436,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        //JSONArray tempNotes = retrieveData(backupPath);
                         getCloudBackup();
-                        /* TODO: Do this in callback
-                        // If backup file exists -> copy backup notes to local file
-                        if (tempNotes != null) {
-                            boolean restoreSuccessful = saveData(localPath, tempNotes);
-
-                            if (restoreSuccessful) {
-                                notes = tempNotes;
-
-                                adapter = new NoteAdapter(getApplicationContext(), notes);
-                                listView.setAdapter(adapter);
-
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_restore_successful),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
-
-                                // If no notes -> show 'Press + to add new note' text, invisible otherwise
-                                if (notes.length() == 0)
-                                    noNotes.setVisibility(View.VISIBLE);
-
-                                else
-                                    noNotes.setVisibility(View.INVISIBLE);
-                            }
-
-                            // If restore unsuccessful -> toast restore unsuccessful
-                            else {
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_restore_unsuccessful),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
-                            }
-                        }
-
-                        // If backup file doesn't exist -> show restore failed dialog
-                        else {
-                            showRestoreFailedDialog();
-                        }
-                        */
                     }
                 })
                 .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
@@ -524,26 +459,42 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
                 })
                 .create();
+        // Dialog to display restore failed when no backup file found
+        cloudRestoreFailedDialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.dialog_restore_failed_title)
+                .setMessage(R.string.dialog_cloud_restore_failed)
+                .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .create();
     }
 
     // Method to dismiss backup check and show backup successful dialog
-    protected void showBackupSuccessfulDialog() {
+    private void showBackupSuccessfulDialog() {
         backupCheckDialog.dismiss();
         backupOKDialog.show();
     }
 
     // Method to dismiss backup check and show backup successful dialog
-    protected void showCloudBackupSuccessfulDialog() {
+    private void showCloudBackupSuccessfulDialog() {
         cloudBackupCheckDialog.dismiss();
         cloudBackupOKDialog.show();
     }
 
     // Method to dismiss restore check and show restore failed dialog
-    protected void showRestoreFailedDialog() {
+    private void showRestoreFailedDialog() {
         restoreCheckDialog.dismiss();
         restoreFailedDialog.show();
     }
 
+    // Method to dismiss restore check and show restore failed dialog
+    private void showCloudRestoreFailedDialog() {
+        cloudRestoreCheckDialog.dismiss();
+        cloudRestoreFailedDialog.show();
+    }
 
     /**
      * If item clicked in list view -> Start EditActivity intent with position as requestCode
@@ -567,9 +518,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if (notes.getJSONObject(newPosition).has(NOTE_HIDE_BODY)) {
                     intent.putExtra(NOTE_HIDE_BODY,
                             notes.getJSONObject(newPosition).getBoolean(NOTE_HIDE_BODY));
-                }
-
-                else
+                } else
                     intent.putExtra(NOTE_HIDE_BODY, false);
 
             } catch (JSONException e) {
@@ -592,9 +541,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if (notes.getJSONObject(position).has(NOTE_HIDE_BODY)) {
                     intent.putExtra(NOTE_HIDE_BODY,
                             notes.getJSONObject(position).getBoolean(NOTE_HIDE_BODY));
-                }
-
-                else
+                } else
                     intent.putExtra(NOTE_HIDE_BODY, false);
 
             } catch (JSONException e) {
@@ -619,27 +566,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (id == R.id.action_cloud_backup) {
             cloudBackupCheckDialog.show();
             return true;
-        }
-
-        // 'Backup notes' pressed -> show backupCheckDialog
-        if (id == R.id.action_backup) {
+        } else if (id == R.id.action_backup) {
             backupCheckDialog.show();
             return true;
-        }
-
-        if (id == R.id.action_cloud_restore) {
+        } else if (id == R.id.action_cloud_restore) {
             cloudRestoreCheckDialog.show();
         }
-
-        // 'Restore notes' pressed -> show restoreCheckDialog
-        if (id == R.id.action_restore) {
+        else if (id == R.id.action_restore) {
             restoreCheckDialog.show();
             return true;
         }
 
         // 'Rate app' pressed -> create new dialog to ask the user if he wants to go to the PlayStore
         // If yes -> start PlayStore and go to app link < If Exception thrown, open in Browser >
-        if (id == R.id.action_rate_app) {
+        else if (id == R.id.action_rate_app) {
             final String appPackageName = getPackageName();
 
             new AlertDialog.Builder(this)
@@ -669,10 +609,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             return true;
         }
-
         return false;
     }
-
 
     /**
      * During multi-choice menu_delete selection mode, callback method if items checked changed
@@ -684,11 +622,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onItemCheckedStateChanged(ActionMode mode, int position, long id, boolean checked) {
         // If item checked -> add to array
-        if (checked)
+        if (checked) {
             checkedArray.add(position);
-
-        // If item unchecked
-        else {
+        } else {
             int index = -1;
 
             // Loop through array and find index of item unchecked
@@ -749,12 +685,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             });
 
                             // If no notes -> show 'Press + to add new note' text, invisible otherwise
-                            if (notes.length() == 0)
+                            if (notes.length() == 0) {
                                 noNotes.setVisibility(View.VISIBLE);
-
-                            else
+                            } else {
                                 noNotes.setVisibility(View.INVISIBLE);
-
+                            }
                             mode.finish();
                         }
                     })
@@ -768,7 +703,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             return true;
         }
-
         return false;
     }
 
@@ -779,14 +713,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         deleteActive = true; // Set deleteActive to true as we entered delete mode
         newNoteButtonVisibility(false); // Hide newNote button
         adapter.notifyDataSetChanged(); // Notify adapter to hide favourite buttons
-
         return true;
     }
 
     // Selection ActionMode finished (delete mode ended)
     @Override
     public void onDestroyActionMode(ActionMode mode) {
-        checkedArray = new ArrayList<Integer>(); // Reset checkedArray
+        checkedArray = new ArrayList<>(); // Reset checkedArray
         deleteActive = false; // Set deleteActive to false as we finished delete mode
         newNoteButtonVisibility(true); // Show newNote button
         adapter.notifyDataSetChanged(); // Notify adapter to show favourite buttons
@@ -802,7 +735,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      * Method to show and hide the newNote button
      * @param isVisible true to show button, false to hide
      */
-    protected void newNoteButtonVisibility(boolean isVisible) {
+    private void newNoteButtonVisibility(boolean isVisible) {
         if (isVisible) {
             newNote.animate().cancel();
             newNote.animate().translationY(newNoteButtonBaseYCoordinate);
@@ -826,7 +759,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (s.length() > 0) {
             // Create new JSONArray and reset realIndexes array
             JSONArray notesFound = new JSONArray();
-            realIndexesOfSearchResults = new ArrayList<Integer>();
+            realIndexesOfSearchResults = new ArrayList<>();
 
             // Loop through main notes list
             for (int i = 0; i < notes.length(); i++) {
@@ -864,7 +797,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // If query text length is 0 -> re-init realIndexes array (0 to length) and reset adapter
         else {
-            realIndexesOfSearchResults = new ArrayList<Integer>();
+            realIndexesOfSearchResults = new ArrayList<>();
             for (int i = 0; i < notes.length(); i++)
                 realIndexesOfSearchResults.add(i);
 
@@ -880,20 +813,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         return false;
     }
 
-
     /**
      * When search mode is finished
      * Collapse searchView widget, searchActive to false, reset adapter, enable listView long clicks
      * and show newNote button
      */
-    protected void searchEnded() {
+    private void searchEnded() {
         searchActive = false;
         adapter = new NoteAdapter(getApplicationContext(), notes);
         listView.setAdapter(adapter);
         listView.setLongClickable(true);
         newNoteButtonVisibility(true);
     }
-
 
     /**
      * Callback method when EditActivity finished adding new note or editing existing note
@@ -916,7 +847,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             if (mBundle != null) {
                 // If new note was saved
                 if (requestCode == NEW_NOTE_REQUEST) {
-                    JSONObject newNoteObject = null;
+                    JSONObject newNoteObject;
 
                     try {
                         // Add new note to array
@@ -935,29 +866,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
 
                     // If newNoteObject not null -> save notes array to local file and notify adapter
-                    if (newNoteObject != null) {
-                        adapter.notifyDataSetChanged();
+                    adapter.notifyDataSetChanged();
 
-                        Boolean saveSuccessful = saveData(localPath, notes);
+                    Boolean saveSuccessful = saveData(localPath, notes);
 
-                        if (saveSuccessful) {
-                            Toast toast = Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.toast_new_note),
-                                    Toast.LENGTH_SHORT);
-                            toast.show();
-                        }
-
-                        // If no notes -> show 'Press + to add new note' text, invisible otherwise
-                        if (notes.length() == 0)
-                            noNotes.setVisibility(View.VISIBLE);
-
-                        else
-                            noNotes.setVisibility(View.INVISIBLE);
+                    if (saveSuccessful) {
+                        Toast toast = Toast.makeText(getApplicationContext(),
+                                getResources().getString(R.string.toast_new_note),
+                                Toast.LENGTH_SHORT);
+                        toast.show();
                     }
-                }
 
-                // If existing note was updated (saved)
-                else {
+                    // If no notes -> show 'Press + to add new note' text, invisible otherwise
+                    if (notes.length() == 0) {
+                        noNotes.setVisibility(View.VISIBLE);
+                    }
+
+                    else {
+                        noNotes.setVisibility(View.INVISIBLE);
+                    }
+                } else { // If existing note was updated (saved)
                     JSONObject newNoteObject = null;
 
                     try {
@@ -991,11 +919,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     }
                 }
             }
-        }
-
-
-        else if (resultCode == RESULT_CANCELED) {
-            Bundle mBundle = null;
+        } else if (resultCode == RESULT_CANCELED) {
+            Bundle mBundle;
 
             // If data is not null, has "request" extra and is new note -> get extras to bundle
             if (data != null && data.hasExtra("request") && requestCode == NEW_NOTE_REQUEST) {
@@ -1115,13 +1040,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      */
     private void trashOldCloudBackups(final DriveId currentDriveId) {
         Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_FILENAME))
+                .addFilter(Filters.eq(SearchableField.TITLE, BACKUP_FILE_NAME))
                 .build();
         Drive.DriveApi.query(mGoogleApiClient, query)
                 .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
                     @Override
-                    public void onResult(DriveApi.MetadataBufferResult result) {
-                        // Iterate over the matching Metadata instances in mdResultSet
+                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
+                        // Trash all files except latest
                         for (Metadata md : result.getMetadataBuffer()) {
                             DriveId did = md.getDriveId();
                             if (!did.equals(currentDriveId)) {
@@ -1137,20 +1062,22 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     /*
-        Clusterfuck of nested callbacks
+        Query GDrive for first file named swiftnotes_data.json.
+        Calls restoreBackup() on reply.
+        Clusterfuck of nested callbacks.
      */
     private void getCloudBackup() {
         Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, CLOUD_BACKUP_FILENAME))
+                .addFilter(Filters.eq(SearchableField.TITLE, BACKUP_FILE_NAME))
                 .build();
-        Log.i(TAG, "Lets get cloud backup from GDrive");
+        Log.i(TAG, "Lets get cloud backup from Google Drive.");
         Drive.DriveApi.query(mGoogleApiClient, query)
                 .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
                     @Override
-                    public void onResult(DriveApi.MetadataBufferResult result) {
+                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
                         if (!result.getStatus().isSuccess()) {
                             // Error
-                            Log.e(TAG, "Something went wrong");
+                            Log.e(TAG, "Could not access files on Google Drive.");
                             return;
                         }
                         DriveId did = result.getMetadataBuffer().get(0).getDriveId();
@@ -1158,9 +1085,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         driveFile.open(mGoogleApiClient, DriveFile.MODE_READ_ONLY, null)
                                 .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
                             @Override
-                            public void onResult(DriveApi.DriveContentsResult result) {
+                            public void onResult(@NonNull DriveApi.DriveContentsResult result) {
                                 if (!result.getStatus().isSuccess()) {
-                                    Log.e(TAG, "Something went wrong #2");
+                                    Log.e(TAG, "Could not open files on Google Drive.");
                                     return;
                                 }
                                 Log.i(TAG, "Retrieved backup.");
@@ -1171,6 +1098,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 });
     }
 
+    /*
+        Restores a backup from Google Drive.
+        Called from getCloudBackup().
+     */
     private void restoreBackup(DriveContents driveContents) {
         JSONObject root = null;
         JSONArray tempNotes = null;
@@ -1205,8 +1136,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         }
 
-        Log.i(TAG, "Got some data.");
-
         boolean restoreSuccessful = saveData(localPath, tempNotes);
         if (restoreSuccessful) {
             Log.i(TAG, "restore successful");
@@ -1221,20 +1150,24 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             toast.show();
 
             // If no notes -> show 'Press + to add new note' text, invisible otherwise
-            if (notes.length() == 0)
+            if (notes.length() == 0) {
                 noNotes.setVisibility(View.VISIBLE);
+            }
 
-            else
+            else {
                 noNotes.setVisibility(View.INVISIBLE);
+            }
         } else {
             Log.i(TAG, "restore unsuccessful");
+            showCloudRestoreFailedDialog();
         }
     }
 
     /*
         Upload file to Google Drive with contents in str, title as title, mimetype as mimetype.
      */
-    private void uploadFile(final DriveContents driveContents, String str, String title, String mimetype) {
+    private void uploadFile(final DriveContents driveContents, String str, String title,
+                            String mimetype) {
         OutputStream outputStream = driveContents.getOutputStream();
         Writer writer = new OutputStreamWriter(outputStream);
         try {
@@ -1248,7 +1181,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .setMimeType(mimetype)
                 .setStarred(false).build();
 
-        // create a file on root folder
+        // Create a file on root folder
         Drive.DriveApi.getRootFolder(mGoogleApiClient)
                 .createFile(mGoogleApiClient, changeSet, driveContents)
                 .setResultCallback(fileCallback);
@@ -1257,9 +1190,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     /**
      * Wrap 'notes' array into a root object and store on Google Drive
      * @param notes Array of notes to be saved
-     * @return true if successfully saved, false otherwise
      */
-    boolean saveDataToCloud(JSONArray notes) {
+    private void saveDataToCloud(JSONArray notes) {
         final JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -1268,40 +1200,35 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 root.put(NOTES_ARRAY_NAME, notes);
             } catch (JSONException e) {
                 e.printStackTrace();
-                return false;
+                return;
             }
         } else {
-            return false; // If passed notes null -> return false
+            return;
         }
 
         Drive.DriveApi.newDriveContents(mGoogleApiClient)
                 .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
-
                     @Override
-                    public void onResult(DriveApi.DriveContentsResult result) {
-                        // If the operation was not successful, we cannot do anything
-                        // and must fail.
+                    public void onResult(@NonNull DriveApi.DriveContentsResult result) {
                         if (!result.getStatus().isSuccess()) {
                             Log.i(TAG, "Failed to create new contents.");
                             return;
                         }
-                        // Otherwise, we can write our data to the new contents.
                         Log.i(TAG, "New contents created.");
                         final DriveContents driveContents = result.getDriveContents();
-                        uploadFile(driveContents, root.toString(), CLOUD_BACKUP_FILENAME, "application/json");
+                        uploadFile(driveContents, root.toString(), BACKUP_FILE_NAME,
+                                    "application/json");
                     }
                 });
-
-        return true;
     }
 
     /*
-        Callback for when a file has been uploaded.
+        Callback for when a backup has been uploaded.
      */
     final private ResultCallback<DriveFolder.DriveFileResult> fileCallback = new
             ResultCallback<DriveFolder.DriveFileResult>() {
         @Override
-        public void onResult(DriveFolder.DriveFileResult result) {
+        public void onResult(@NonNull DriveFolder.DriveFileResult result) {
             if (!result.getStatus().isSuccess()) {
                 Log.i(TAG, "Error while trying to create the file");
                 Toast toast = Toast.makeText(getApplicationContext(),
@@ -1327,7 +1254,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             searchMenu.collapseActionView();
             return;
         }
-
         super.onBackPressed();
     }
 
@@ -1350,10 +1276,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         if (cloudBackupOKDialog != null && cloudBackupOKDialog.isShowing())
             cloudBackupOKDialog.dismiss();
 
+        if (cloudRestoreCheckDialog != null && cloudRestoreCheckDialog.isShowing())
+            restoreCheckDialog.dismiss();
+
         if (restoreCheckDialog != null && restoreCheckDialog.isShowing())
             restoreCheckDialog.dismiss();
 
         if (restoreFailedDialog != null && restoreFailedDialog.isShowing())
+            restoreFailedDialog.dismiss();
+
+        if (cloudRestoreFailedDialog != null && cloudRestoreFailedDialog.isShowing())
             restoreFailedDialog.dismiss();
 
         super.onConfigurationChanged(newConfig);
@@ -1403,11 +1335,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     @Override
-    public void onConnectionFailed(ConnectionResult result) {
+    public void onConnectionFailed(@NonNull ConnectionResult result) {
         // Called whenever the API client fails to connect.
         Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
         if (!result.hasResolution()) {
-            // show the localized error dialog.
+            // Show the localized error dialog.
             GoogleApiAvailability.getInstance().getErrorDialog(this, result.getErrorCode(), 0).show();
             return;
         }
@@ -1420,7 +1352,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         } catch (IntentSender.SendIntentException e) {
             Log.e(TAG, "Exception while starting resolution activity", e);
         }
-
     }
 
     @Override
