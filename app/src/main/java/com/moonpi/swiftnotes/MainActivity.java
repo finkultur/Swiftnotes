@@ -51,10 +51,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -73,6 +71,7 @@ import static com.moonpi.swiftnotes.DataUtils.NOTE_FONT_SIZE;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_HIDE_BODY;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_REQUEST_CODE;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_TITLE;
+import static com.moonpi.swiftnotes.DataUtils.retrieveData;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener,
         Toolbar.OnMenuItemClickListener, AbsListView.MultiChoiceModeListener,
@@ -121,8 +120,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         if (DataUtils.isExternalStorageReadable()
                 && DataUtils.isExternalStorageWritable()
-                && !backupFolder.exists())
-            backupFolder.mkdir();
+                && !backupFolder.exists()) {
+            if (!backupFolder.mkdir()) {
+                Log.i(TAG, "Failed to create folder on external storage");
+            }
+        }
 
         backupPath = new File(backupFolder, BACKUP_FILE_NAME);
 
@@ -925,7 +927,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 mBundle = data.getExtras();
 
                 // If new note discarded -> toast empty note discarded
-                if (mBundle != null && mBundle.getString("request").equals("discard")) {
+                if (mBundle != null && "discard".equals(mBundle.getString("request"))) {
                     Toast toast = Toast.makeText(getApplicationContext(),
                             getResources().getString(R.string.toast_empty_note_discarded),
                             Toast.LENGTH_SHORT);
@@ -960,7 +962,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 // Set favoured to true
                 try {
                     newFavourite.put(NOTE_FAVOURED, true);
-
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -972,7 +973,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                     try {
                         newArray.put(0, newFavourite);
-
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -1006,11 +1006,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 else {
                     try {
                         notes.put(position, newFavourite);
-
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
-
                     adapter.notifyDataSetChanged();
                 }
             }
@@ -1020,11 +1018,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 try {
                     newFavourite.put(NOTE_FAVOURED, false);
                     notes.put(position, newFavourite);
-
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
-
                 adapter.notifyDataSetChanged();
             }
 
@@ -1055,7 +1051,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             }
                         }
                         result.release();
-
                         Log.i(TAG, "Trashed old backups.");
                     }
                 });
@@ -1091,7 +1086,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                                     return;
                                 }
                                 Log.i(TAG, "Retrieved backup.");
-                                restoreBackup(result.getDriveContents().getInputStream());
+                                InputStreamReader isr = new InputStreamReader(
+                                        result.getDriveContents().getInputStream());
+                                restoreCloudData(retrieveData(isr));
                             }
                           });
                     }
@@ -1099,43 +1096,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
     /*
-        Restores a backup from InputStream is.
-        Called from getCloudBackup().
-        @param is InputStream, presumably from DriveContents.getInputstream()
+        Tries to save received data from cloud into localPath.
      */
-    private void restoreBackup(InputStream is) {
-        JSONObject root = null;
-        JSONArray tempNotes = null;
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-
-        try {
-            String line;
-            StringBuilder builder = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                builder.append(line);
-            }
-            root = new JSONObject(builder.toString());
-        } catch (IOException e) {
-            Log.e(TAG, "IOException while reading from the stream", e);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                reader.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // If root is not null -> get notes array from root object
-        if (root != null) {
-            try {
-                tempNotes = root.getJSONArray(NOTES_ARRAY_NAME);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-
+    private void restoreCloudData(JSONArray tempNotes) {
         boolean restoreSuccessful = DataUtils.saveData(localPath, tempNotes);
         if (restoreSuccessful) {
             Log.i(TAG, "restore successful");
@@ -1239,7 +1202,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
             DriveId currentDriveId = result.getDriveFile().getDriveId();
             Log.i(TAG, "Created a file with content: " + currentDriveId);
-
             showCloudBackupSuccessfulDialog();
             trashOldCloudBackups(currentDriveId);
         }

@@ -9,9 +9,11 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 import static com.moonpi.swiftnotes.MainActivity.getBackupPath;
@@ -59,7 +61,6 @@ class DataUtils {
      */
     static boolean saveData(File toFile, JSONArray notes) {
         Boolean successful = false;
-
         JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -72,7 +73,6 @@ class DataUtils {
                 return false;
             }
         }
-
         // If passed notes null -> return false
         else {
             return false;
@@ -84,18 +84,15 @@ class DataUtils {
                 if (!toFile.exists()) {
                     try {
                         Boolean created = toFile.createNewFile();
-
                         // If file failed to create -> return false
                         if (!created)
                             return false;
-
                     } catch (IOException e) {
                         e.printStackTrace();
                         return false; // If file creation threw exception -> return false
                     }
                 }
             }
-
             // If external storage not readable/writable -> return false
             else
                 return false;
@@ -116,22 +113,17 @@ class DataUtils {
             }
         }
 
-
         BufferedWriter bufferedWriter = null;
-
         try {
             // Initialize BufferedWriter with FileWriter and write root object to file
             bufferedWriter = new BufferedWriter(new FileWriter(toFile));
             bufferedWriter.write(root.toString());
-
             // If we got to this stage without throwing an exception -> set successful to true
             successful = true;
-
         } catch (IOException e) {
             // If something went wrong in try block -> set successful to false
             successful = false;
             e.printStackTrace();
-
         } finally {
             // Finally, if bufferedWriter not null -> flush and close it
             if (bufferedWriter != null) {
@@ -144,7 +136,6 @@ class DataUtils {
                 }
             }
         }
-
         return successful;
     }
 
@@ -181,26 +172,35 @@ class DataUtils {
             return null;
         }
 
+        try {
+            return retrieveData(new FileReader(fromFile));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
+    /**
+     * Read from file 'fromFile' and return parsed JSONArray of notes
+     * @param isr InputStreamReader we are reading from
+     * @return JSONArray of notes
+     */
+    static JSONArray retrieveData(InputStreamReader isr) {
+        JSONArray notes = null;
         JSONObject root = null;
         BufferedReader bufferedReader = null;
 
         try {
             // Initialize BufferedReader, read from 'fromFile' and store into root object
-            bufferedReader = new BufferedReader(new FileReader(fromFile));
-
+            bufferedReader = new BufferedReader(isr);
             StringBuilder text = new StringBuilder();
             String line;
-
             while ((line = bufferedReader.readLine()) != null) {
                 text.append(line);
             }
-
             root = new JSONObject(text.toString());
-
         } catch (IOException | JSONException e) {
             e.printStackTrace();
-
         } finally {
             // Finally, if bufferedReader not null -> close it
             if (bufferedReader != null) {
@@ -212,7 +212,6 @@ class DataUtils {
                 }
             }
         }
-
         // If root is not null -> get notes array from root object
         if (root != null) {
             try {
@@ -222,7 +221,6 @@ class DataUtils {
                 e.printStackTrace();
             }
         }
-
         // Return fetches notes < May return null! >
         return notes;
     }
