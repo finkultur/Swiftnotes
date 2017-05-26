@@ -24,6 +24,8 @@ import android.widget.Toast;
 
 import com.moonpi.swiftnotes.ColorPicker.ColorPickerDialog;
 
+import java.util.Random;
+
 import static com.moonpi.swiftnotes.ColorPicker.ColorPickerSwatch.OnColorSelectedListener;
 import static com.moonpi.swiftnotes.ColorPicker.ColorPickerSwatch.OnTouchListener;
 import static com.moonpi.swiftnotes.DataUtils.NEW_NOTE_REQUEST;
@@ -136,6 +138,9 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
             else if (bundle.getInt(NOTE_REQUEST_CODE) == NEW_NOTE_REQUEST) {
                 titleEdit.requestFocus();
                 imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+
+                // Every new note gets a random colour
+                colour = colourArr[new Random().nextInt(colourArr.length)];
             }
 
             // Set background colour to note colour
