@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.support.v4.content.ContextCompat;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,8 +19,16 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import static com.moonpi.swiftnotes.DataUtils.*;
-import static com.moonpi.swiftnotes.MainActivity.*;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_BODY;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_COLOUR;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_FAVOURED;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_FONT_SIZE;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_HIDE_BODY;
+import static com.moonpi.swiftnotes.DataUtils.NOTE_TITLE;
+import static com.moonpi.swiftnotes.MainActivity.checkedArray;
+import static com.moonpi.swiftnotes.MainActivity.deleteActive;
+import static com.moonpi.swiftnotes.MainActivity.searchActive;
+import static com.moonpi.swiftnotes.MainActivity.setFavourite;
 
 
 /**
@@ -76,7 +85,8 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
 
         // Initialize layout items
         RelativeLayout relativeLayout = (RelativeLayout) convertView.findViewById(R.id.relativeLayout);
-        LayerDrawable roundedCard = (LayerDrawable) context.getResources().getDrawable(R.drawable.rounded_card);
+        LayerDrawable roundedCard =
+                (LayerDrawable) ContextCompat.getDrawable(context, R.drawable.rounded_card);
         TextView titleView = (TextView) convertView.findViewById(R.id.titleView);
         TextView bodyView = (TextView) convertView.findViewById(R.id.bodyView);
         ImageButton favourite = (ImageButton) convertView.findViewById(R.id.favourite);
@@ -88,7 +98,7 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
             // If noteObject not empty -> initialize variables
             String title = context.getString(R.string.note_title);
             String body = context.getString(R.string.note_body);
-            String colour = String.valueOf(context.getResources().getColor(R.color.white));
+            String colour = String.valueOf(ContextCompat.getColor(context, R.color.white));
             int fontSize = 18;
             Boolean hideBody = false;
             Boolean favoured = false;
@@ -143,7 +153,7 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
             // If current note is selected for deletion -> highlight
             if (checkedArray.contains(position)) {
                 ((GradientDrawable) roundedCard.findDrawableByLayerId(R.id.card))
-                        .setColor(context.getResources().getColor(R.color.theme_primary));
+                        .setColor(ContextCompat.getColor(context, R.color.theme_primary));
             }
 
             // If current note is not selected -> set background colour to normal

@@ -72,9 +72,7 @@ class DataUtils {
                 e.printStackTrace();
                 return false;
             }
-        }
-        // If passed notes null -> return false
-        else {
+        } else { // If passed notes null -> return false
             return false;
         }
 
@@ -145,7 +143,7 @@ class DataUtils {
      * @return JSONArray of notes
      */
     static JSONArray retrieveData(File fromFile) {
-        JSONArray notes = null;
+        JSONArray notes;
 
         // If file is backup and it doesn't exist -> return null
         if (fromFile == getBackupPath()) {
@@ -160,14 +158,11 @@ class DataUtils {
          */
         else if (fromFile == getLocalPath() && !fromFile.exists()) {
             notes = new JSONArray();
-
             Boolean successfulSaveToLocal = saveData(fromFile, notes);
-
             // If save successful -> return new notes
             if (successfulSaveToLocal) {
                 return notes;
             }
-
             // Else -> return null
             return null;
         }
@@ -206,7 +201,6 @@ class DataUtils {
             if (bufferedReader != null) {
                 try {
                     bufferedReader.close();
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -248,7 +242,6 @@ class DataUtils {
                 }
             }
         }
-
         // Finally, return the new notes
         return newNotes;
     }
