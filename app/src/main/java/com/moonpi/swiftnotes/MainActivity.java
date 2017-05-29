@@ -302,16 +302,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             if (backupSuccessful) {
                                 showBackupSuccessfulDialog();
                             } else {
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_backup_failed),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
+                                showToast(R.string.toast_backup_failed);
                             }
                         } else { // If notes array is empty -> toast backup no notes found
-                            Toast toast = Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.toast_backup_no_notes),
-                                    Toast.LENGTH_SHORT);
-                            toast.show();
+                            showToast(R.string.toast_backup_no_notes);
                         }
                     }
                 })
@@ -334,10 +328,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             saveDataToCloud(notes, BACKUP_FILE_NAME);
                             // TODO: Check that this really happens
                         } else { // If notes array is empty -> toast backup no notes found
-                            Toast toast = Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.toast_backup_no_notes),
-                                    Toast.LENGTH_SHORT);
-                            toast.show();
+                            showToast(R.string.toast_backup_no_notes);
                         }
                     }
                 })
@@ -394,28 +385,18 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             if (restoreSuccessful) {
                                 notes = tempNotes;
-
                                 adapter = new NoteAdapter(getApplicationContext(), notes);
                                 listView.setAdapter(adapter);
 
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_restore_successful),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
+                                showToast(R.string.toast_restore_successful);
 
                                 // If no notes -> show 'Press + to add new note' text, invisible otherwise
                                 if (notes.length() == 0) {
                                     noNotes.setVisibility(View.VISIBLE);
                                 } else
                                     noNotes.setVisibility(View.INVISIBLE);
-                            }
-
-                            // If restore unsuccessful -> toast restore unsuccessful
-                            else {
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_restore_unsuccessful),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
+                            } else {
+                                showToast(R.string.toast_restore_unsuccessful);
                             }
                         }
 
@@ -675,10 +656,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             // If save successful -> toast successfully deleted
                             if (saveSuccessful) {
-                                Toast toast = Toast.makeText(getApplicationContext(),
-                                        getResources().getString(R.string.toast_deleted),
-                                        Toast.LENGTH_SHORT);
-                                toast.show();
+                                showToast(R.string.toast_deleted);
                             }
 
                             // Smooth scroll to top
@@ -877,10 +855,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     // TODO: Check that this really happens
 
                     if (saveSuccessful) {
-                        Toast toast = Toast.makeText(getApplicationContext(),
-                                getResources().getString(R.string.toast_new_note),
-                                Toast.LENGTH_SHORT);
-                        toast.show();
+                        showToast(R.string.toast_new_note);
                     }
 
                     // If no notes -> show 'Press + to add new note' text, invisible otherwise
@@ -919,10 +894,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         // TODO: Check that this really happens
 
                         if (saveSuccessful) {
-                            Toast toast = Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.toast_note_saved),
-                                    Toast.LENGTH_SHORT);
-                            toast.show();
+                            showToast(R.string.toast_note_saved);
                         }
                     }
                 }
@@ -936,10 +908,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                 // If new note discarded -> toast empty note discarded
                 if (mBundle != null && "discard".equals(mBundle.getString("request"))) {
-                    Toast toast = Toast.makeText(getApplicationContext(),
-                            getResources().getString(R.string.toast_empty_note_discarded),
-                            Toast.LENGTH_SHORT);
-                    toast.show();
+                    showToast(R.string.toast_empty_note_discarded);
                 }
             }
         }
@@ -1089,17 +1058,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             adapter = new NoteAdapter(getApplicationContext(), notes);
             listView.setAdapter(adapter);
 
-            Toast toast = Toast.makeText(getApplicationContext(),
-                    getResources().getString(R.string.toast_restore_successful),
-                    Toast.LENGTH_SHORT);
-            toast.show();
+            // TODO: Not so sure this is really successful
+            showToast(R.string.toast_restore_successful);
 
             // If no notes -> show 'Press + to add new note' text, invisible otherwise
             if (notes.length() == 0) {
                 noNotes.setVisibility(View.VISIBLE);
-            }
-
-            else {
+            } else {
                 noNotes.setVisibility(View.INVISIBLE);
             }
         } else {
@@ -1170,10 +1135,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onResult(@NonNull DriveFolder.DriveFileResult result) {
                         if (!result.getStatus().isSuccess()) {
                             Log.i(TAG, "Error while trying to create the file");
-                            Toast toast = Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.toast_backup_failed),
-                                    Toast.LENGTH_SHORT);
-                            toast.show();
+                            showToast(R.string.toast_backup_failed);
                             return;
                         }
                         DriveId currentDriveId = result.getDriveFile().getDriveId();
@@ -1209,6 +1171,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         Log.i(TAG, "Trashed old files.");
                     }
                 });
+    }
+
+    /**
+     * Shows a toast with the given message.
+     */
+    private void showToast(int id) {
+        Toast.makeText(this, id, Toast.LENGTH_SHORT).show();
     }
 
     /**
