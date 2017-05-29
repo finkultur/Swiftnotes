@@ -83,6 +83,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Google Drive stuff
     private GoogleApiClient mGoogleApiClient;
     private static final int REQUEST_CODE_RESOLUTION = 3;
+    private static final String DRIVE_FILE_NAME = "swiftnotes_current.json";
 
     // Layout components
     private static ListView listView;
@@ -330,7 +331,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            saveDataToCloud(notes);
+                            saveDataToCloud(notes, BACKUP_FILE_NAME);
+                            // TODO: Check that this really happens
                         } else { // If notes array is empty -> toast backup no notes found
                             Toast toast = Toast.makeText(getApplicationContext(),
                                     getResources().getString(R.string.toast_backup_no_notes),
@@ -668,6 +670,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             // Attempt to save notes to local file
                             Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
+                            saveDataToCloud(notes, DRIVE_FILE_NAME);
+                            // TODO: Check that this really happens
 
                             // If save successful -> toast successfully deleted
                             if (saveSuccessful) {
@@ -869,6 +873,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     adapter.notifyDataSetChanged();
 
                     Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
+                    saveDataToCloud(notes, DRIVE_FILE_NAME);
+                    // TODO: Check that this really happens
 
                     if (saveSuccessful) {
                         Toast toast = Toast.makeText(getApplicationContext(),
@@ -909,6 +915,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         adapter.notifyDataSetChanged();
 
                         Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
+                        saveDataToCloud(notes, DRIVE_FILE_NAME);
+                        // TODO: Check that this really happens
 
                         if (saveSuccessful) {
                             Toast toast = Toast.makeText(getApplicationContext(),
@@ -1026,34 +1034,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
             // Save notes to local file
             DataUtils.saveData(localPath, notes);
+            // Cant save from static context
         }
-    }
-
-    /*
-        Trash old backups.
-     */
-    private void trashOldCloudBackups(final DriveId currentDriveId) {
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, BACKUP_FILE_NAME))
-                .build();
-        Drive.DriveApi.query(mGoogleApiClient, query)
-                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
-                    @Override
-                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
-                        // Trash all files except latest
-                        for (Metadata md : result.getMetadataBuffer()) {
-                            DriveId did = md.getDriveId();
-                            if (!did.equals(currentDriveId)) {
-                                DriveResource driveResource = did.asDriveResource();
-                                if (!md.isTrashed()) {
-                                    driveResource.trash(mGoogleApiClient);
-                                }
-                            }
-                        }
-                        result.release();
-                        Log.i(TAG, "Trashed old backups.");
-                    }
-                });
     }
 
     /*
@@ -1126,35 +1108,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
-    /*
-        Upload file to Google Drive with contents in str, title as title, mimetype as mimetype.
-     */
-    private void uploadFile(final DriveContents driveContents, String str, String title,
-                            String mimetype) {
-        OutputStream outputStream = driveContents.getOutputStream();
-        Writer writer = new OutputStreamWriter(outputStream);
-        try {
-            writer.write(str);
-            writer.close();
-        } catch (IOException e) {
-            Log.e(TAG, e.getMessage());
-        }
-        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                .setTitle(title)
-                .setMimeType(mimetype)
-                .setStarred(false).build();
-
-        // Create a file on root folder
-        Drive.DriveApi.getRootFolder(mGoogleApiClient)
-                .createFile(mGoogleApiClient, changeSet, driveContents)
-                .setResultCallback(fileCallback);
-    }
-
     /**
      * Wrap 'notes' array into a root object and store on Google Drive
      * @param notes Array of notes to be saved
      */
-    private void saveDataToCloud(JSONArray notes) {
+    private void saveDataToCloud(JSONArray notes, final String fileName) {
         final JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -1179,33 +1137,79 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         }
                         Log.i(TAG, "New contents created.");
                         final DriveContents driveContents = result.getDriveContents();
-                        uploadFile(driveContents, root.toString(), BACKUP_FILE_NAME,
+                        uploadFile(driveContents, root.toString(), fileName,
                                     "application/json");
                     }
                 });
     }
 
+
     /*
-        Callback for when a backup has been uploaded.
+        Upload file to Google Drive with contents in str, title as title, mimetype as mimetype.
      */
-    final private ResultCallback<DriveFolder.DriveFileResult> fileCallback = new
-            ResultCallback<DriveFolder.DriveFileResult>() {
-        @Override
-        public void onResult(@NonNull DriveFolder.DriveFileResult result) {
-            if (!result.getStatus().isSuccess()) {
-                Log.i(TAG, "Error while trying to create the file");
-                Toast toast = Toast.makeText(getApplicationContext(),
-                        getResources().getString(R.string.toast_backup_failed),
-                        Toast.LENGTH_SHORT);
-                toast.show();
-                return;
-            }
-            DriveId currentDriveId = result.getDriveFile().getDriveId();
-            Log.i(TAG, "Created a file with content: " + currentDriveId);
-            showCloudBackupSuccessfulDialog();
-            trashOldCloudBackups(currentDriveId);
+    private void uploadFile(final DriveContents driveContents,
+                            final String str, final String title, final String mimetype) {
+        OutputStream outputStream = driveContents.getOutputStream();
+        Writer writer = new OutputStreamWriter(outputStream);
+        try {
+            writer.write(str);
+            writer.close();
+        } catch (IOException e) {
+            Log.e(TAG, e.getMessage());
         }
-    };
+        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                .setTitle(title)
+                .setMimeType(mimetype)
+                .setStarred(false).build();
+
+        // Create a file on root folder
+        Drive.DriveApi.getRootFolder(mGoogleApiClient)
+                .createFile(mGoogleApiClient, changeSet, driveContents)
+                .setResultCallback(new ResultCallback<DriveFolder.DriveFileResult>() {
+                    @Override
+                    public void onResult(@NonNull DriveFolder.DriveFileResult result) {
+                        if (!result.getStatus().isSuccess()) {
+                            Log.i(TAG, "Error while trying to create the file");
+                            Toast toast = Toast.makeText(getApplicationContext(),
+                                    getResources().getString(R.string.toast_backup_failed),
+                                    Toast.LENGTH_SHORT);
+                            toast.show();
+                            return;
+                        }
+                        DriveId currentDriveId = result.getDriveFile().getDriveId();
+                        Log.i(TAG, "Created a file with content: " + currentDriveId);
+                        showCloudBackupSuccessfulDialog();
+                        trashOldFiles(currentDriveId, title);
+                    }
+                });
+    }
+
+    /*
+    Trash old files matching filename, except given DriveId.
+    */
+    private void trashOldFiles(final DriveId currentDriveId, final String fileName) {
+        Query query = new Query.Builder()
+                .addFilter(Filters.eq(SearchableField.TITLE, fileName))
+                .build();
+        Drive.DriveApi.query(mGoogleApiClient, query)
+                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
+                    @Override
+                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
+                        // Trash all files except given DriveId
+                        for (Metadata md : result.getMetadataBuffer()) {
+                            DriveId did = md.getDriveId();
+                            if (!did.equals(currentDriveId)) {
+                                DriveResource driveResource = did.asDriveResource();
+                                if (!md.isTrashed()) {
+                                    driveResource.trash(mGoogleApiClient);
+                                }
+                            }
+                        }
+                        result.release();
+                        Log.i(TAG, "Trashed old files.");
+                    }
+                });
+    }
 
     /**
      * If back button pressed while search is active -> collapse view and end search mode
