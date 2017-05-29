@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 
-import static com.moonpi.swiftnotes.MainActivity.getBackupPath;
 import static com.moonpi.swiftnotes.MainActivity.getLocalPath;
 
     /*
@@ -76,28 +75,8 @@ class DataUtils {
             return false;
         }
 
-        // If file is backup and it doesn't exist -> create file
-        if (toFile == getBackupPath()) {
-            if (isExternalStorageReadable() && isExternalStorageWritable()) {
-                if (!toFile.exists()) {
-                    try {
-                        Boolean created = toFile.createNewFile();
-                        // If file failed to create -> return false
-                        if (!created)
-                            return false;
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        return false; // If file creation threw exception -> return false
-                    }
-                }
-            }
-            // If external storage not readable/writable -> return false
-            else
-                return false;
-        }
-
         // If file is local and it doesn't exist -> create file
-        else if (toFile == getLocalPath() && !toFile.exists()) {
+        if (toFile == getLocalPath() && !toFile.exists()) {
             try {
                 Boolean created = toFile.createNewFile();
 
@@ -145,18 +124,11 @@ class DataUtils {
     static JSONArray retrieveData(File fromFile) {
         JSONArray notes;
 
-        // If file is backup and it doesn't exist -> return null
-        if (fromFile == getBackupPath()) {
-            if (isExternalStorageReadable() && !fromFile.exists()) {
-                return null;
-            }
-        }
-
         /*
          * If file is local and it doesn't exist ->
          * Initialize notes JSONArray as new and save into local file
          */
-        else if (fromFile == getLocalPath() && !fromFile.exists()) {
+        if (fromFile == getLocalPath() && !fromFile.exists()) {
             notes = new JSONArray();
             Boolean successfulSaveToLocal = saveData(fromFile, notes);
             // If save successful -> return new notes
@@ -245,7 +217,6 @@ class DataUtils {
         // Finally, return the new notes
         return newNotes;
     }
-
 
     /**
      * Check if external storage is writable or not

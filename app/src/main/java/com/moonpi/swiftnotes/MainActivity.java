@@ -10,7 +10,6 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -60,7 +59,6 @@ import java.io.Writer;
 import java.util.ArrayList;
 
 import static com.moonpi.swiftnotes.DataUtils.BACKUP_FILE_NAME;
-import static com.moonpi.swiftnotes.DataUtils.BACKUP_FOLDER_PATH;
 import static com.moonpi.swiftnotes.DataUtils.NEW_NOTE_REQUEST;
 import static com.moonpi.swiftnotes.DataUtils.NOTES_ARRAY_NAME;
 import static com.moonpi.swiftnotes.DataUtils.NOTES_FILE_NAME;
@@ -78,7 +76,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         SearchView.OnQueryTextListener, ConnectionCallbacks, OnConnectionFailedListener {
 
     private static final String TAG = "swiftnotes";
-    private static File localPath, backupPath;
+    private static File localPath;
 
     // Google Drive stuff
     private GoogleApiClient mGoogleApiClient;
@@ -106,9 +104,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private int lastFirstVisibleItem = -1; // Last first item seen in list view scroll changed
     private float newNoteButtonBaseYCoordinate; // Base Y coordinate of newNote button
 
-    private AlertDialog cloudBackupCheckDialog, backupCheckDialog, cloudBackupOKDialog,
-                        backupOKDialog, cloudRestoreCheckDialog, restoreCheckDialog,
-                        cloudRestoreFailedDialog, restoreFailedDialog;
+    private AlertDialog backupCheckDialog, backupOKDialog, restoreCheckDialog, restoreFailedDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,18 +112,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Initialize local file path and backup file path
         localPath = new File(getFilesDir() + "/" + NOTES_FILE_NAME);
-
-        File backupFolder = new File(Environment.getExternalStorageDirectory() + BACKUP_FOLDER_PATH);
-
-        if (DataUtils.isExternalStorageReadable()
-                && DataUtils.isExternalStorageWritable()
-                && !backupFolder.exists()) {
-            if (!backupFolder.mkdir()) {
-                Log.i(TAG, "Failed to create folder on external storage");
-            }
-        }
-
-        backupPath = new File(backupFolder, BACKUP_FILE_NAME);
 
         // Android version >= 18 -> set orientation userPortrait
         if (Build.VERSION.SDK_INT >= 18)
@@ -287,7 +271,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
          * Backup check dialog
          *  If not sure -> dismiss
          *  If yes -> check if notes length > 0
-         *    If yes -> save current notes to backup file in backupPath
+         *    If yes -> save current notes GDrive
          */
         backupCheckDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.action_backup)
@@ -297,35 +281,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            boolean backupSuccessful = DataUtils.saveData(backupPath, notes);
-
-                            if (backupSuccessful) {
-                                showBackupSuccessfulDialog();
-                            } else {
-                                showToast(R.string.toast_backup_failed);
-                            }
-                        } else { // If notes array is empty -> toast backup no notes found
-                            showToast(R.string.toast_backup_no_notes);
-                        }
-                    }
-                })
-                .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                })
-                .create();
-
-        cloudBackupCheckDialog = new AlertDialog.Builder(context)
-                .setTitle(R.string.action_cloud_backup)
-                .setMessage(R.string.dialog_check_backup_if_sure)
-                .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        // If note array not empty -> continue
-                        if (notes.length() > 0) {
-                            saveDataToCloud(notes, BACKUP_FILE_NAME);
+                            saveDataToGDrive(notes, BACKUP_FILE_NAME);
                             // TODO: Check that this really happens
                         } else { // If notes array is empty -> toast backup no notes found
                             showToast(R.string.toast_backup_no_notes);
@@ -340,22 +296,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
-        // Dialog to display backup was successfully created in backupPath
+        // Dialog to display backup was successfully uploaded to GDrive
         backupOKDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.dialog_backup_created_title)
-                .setMessage(getString(R.string.dialog_backup_created) + " "
-                        + backupPath.getAbsolutePath())
-                .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                })
-                .create();
-        // Dialog to display backup was successfully uploaded to GDrive
-        cloudBackupOKDialog = new AlertDialog.Builder(context)
-                .setTitle(R.string.dialog_backup_created_title)
-                .setMessage(getString(R.string.dialog_cloud_backup_created))
+                .setMessage(getString(R.string.dialog_gdrive_backup_created))
                 .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -364,56 +308,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
-        /*
-         * Restore check dialog
-         *  If not sure -> dismiss
-         *  If yes -> check if backup notes exists
-         *    If not -> display restore failed dialog
-         *    If yes -> retrieve notes from backup file and store into local file
-         */
         restoreCheckDialog = new AlertDialog.Builder(context)
-                .setTitle(R.string.action_restore)
-                .setMessage(R.string.dialog_check_restore_if_sure)
-                .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        JSONArray tempNotes = DataUtils.retrieveData(backupPath);
-
-                        // If backup file exists -> copy backup notes to local file
-                        if (tempNotes != null) {
-                            boolean restoreSuccessful = DataUtils.saveData(localPath, tempNotes);
-
-                            if (restoreSuccessful) {
-                                notes = tempNotes;
-                                adapter = new NoteAdapter(getApplicationContext(), notes);
-                                listView.setAdapter(adapter);
-
-                                showToast(R.string.toast_restore_successful);
-
-                                // If no notes -> show 'Press + to add new note' text, invisible otherwise
-                                if (notes.length() == 0) {
-                                    noNotes.setVisibility(View.VISIBLE);
-                                } else
-                                    noNotes.setVisibility(View.INVISIBLE);
-                            } else {
-                                showToast(R.string.toast_restore_unsuccessful);
-                            }
-                        }
-
-                        // If backup file doesn't exist -> show restore failed dialog
-                        else
-                            showRestoreFailedDialog();
-                    }
-                })
-                .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                })
-                .create();
-
-        cloudRestoreCheckDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.action_restore)
                 .setMessage(R.string.dialog_check_restore_if_sure)
                 .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
@@ -430,22 +325,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 })
                 .create();
 
-
         // Dialog to display restore failed when no backup file found
         restoreFailedDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.dialog_restore_failed_title)
-                .setMessage(R.string.dialog_restore_failed)
-                .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                })
-                .create();
-        // Dialog to display restore failed when no backup file found
-        cloudRestoreFailedDialog = new AlertDialog.Builder(context)
-                .setTitle(R.string.dialog_restore_failed_title)
-                .setMessage(R.string.dialog_cloud_restore_failed)
+                .setMessage(R.string.dialog_gdrive_restore_failed)
                 .setNeutralButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -461,22 +344,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         backupOKDialog.show();
     }
 
-    // Method to dismiss backup check and show backup successful dialog
-    private void showCloudBackupSuccessfulDialog() {
-        cloudBackupCheckDialog.dismiss();
-        cloudBackupOKDialog.show();
-    }
-
     // Method to dismiss restore check and show restore failed dialog
     private void showRestoreFailedDialog() {
         restoreCheckDialog.dismiss();
         restoreFailedDialog.show();
-    }
-
-    // Method to dismiss restore check and show restore failed dialog
-    private void showCloudRestoreFailedDialog() {
-        cloudRestoreCheckDialog.dismiss();
-        cloudRestoreFailedDialog.show();
     }
 
     /**
@@ -546,18 +417,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     public boolean onMenuItemClick(MenuItem menuItem) {
         int id = menuItem.getItemId();
 
-        if (id == R.id.action_cloud_backup) {
-            cloudBackupCheckDialog.show();
-            return true;
-        } else if (id == R.id.action_backup) {
+        if (id == R.id.action_backup) {
             backupCheckDialog.show();
             return true;
-        } else if (id == R.id.action_cloud_restore) {
-            cloudRestoreCheckDialog.show();
-        }
-        else if (id == R.id.action_restore) {
+        } else if (id == R.id.action_restore) {
             restoreCheckDialog.show();
-            return true;
         }
 
         // 'Rate app' pressed -> create new dialog to ask the user if he wants to go to the PlayStore
@@ -651,7 +515,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             // Attempt to save notes to local file
                             Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                            saveDataToCloud(notes, DRIVE_FILE_NAME);
+                            saveDataToGDrive(notes, DRIVE_FILE_NAME);
                             // TODO: Check that this really happens
 
                             // If save successful -> toast successfully deleted
@@ -851,7 +715,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     adapter.notifyDataSetChanged();
 
                     Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                    saveDataToCloud(notes, DRIVE_FILE_NAME);
+                    saveDataToGDrive(notes, DRIVE_FILE_NAME);
                     // TODO: Check that this really happens
 
                     if (saveSuccessful) {
@@ -890,7 +754,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         adapter.notifyDataSetChanged();
 
                         Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                        saveDataToCloud(notes, DRIVE_FILE_NAME);
+                        saveDataToGDrive(notes, DRIVE_FILE_NAME);
                         // TODO: Check that this really happens
 
                         if (saveSuccessful) {
@@ -1069,7 +933,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         } else {
             Log.i(TAG, "restore unsuccessful");
-            showCloudRestoreFailedDialog();
+            showRestoreFailedDialog();
         }
     }
 
@@ -1077,7 +941,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      * Wrap 'notes' array into a root object and store on Google Drive
      * @param notes Array of notes to be saved
      */
-    private void saveDataToCloud(JSONArray notes, final String fileName) {
+    private void saveDataToGDrive(JSONArray notes, final String fileName) {
         final JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -1198,41 +1062,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      */
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
-        if (backupCheckDialog != null && backupCheckDialog.isShowing())
+        if (backupCheckDialog != null && backupCheckDialog.isShowing()) {
             backupCheckDialog.dismiss();
-
-        if (cloudBackupCheckDialog != null && cloudBackupCheckDialog.isShowing())
-            cloudBackupCheckDialog.dismiss();
-
-        if (backupOKDialog != null && backupOKDialog.isShowing())
+        } else if (backupOKDialog != null && backupOKDialog.isShowing()) {
             backupOKDialog.dismiss();
-
-        if (cloudBackupOKDialog != null && cloudBackupOKDialog.isShowing())
-            cloudBackupOKDialog.dismiss();
-
-        if (cloudRestoreCheckDialog != null && cloudRestoreCheckDialog.isShowing())
+        } else if (restoreCheckDialog != null && restoreCheckDialog.isShowing()) {
             restoreCheckDialog.dismiss();
-
-        if (restoreCheckDialog != null && restoreCheckDialog.isShowing())
-            restoreCheckDialog.dismiss();
-
-        if (restoreFailedDialog != null && restoreFailedDialog.isShowing())
+        } else if (restoreFailedDialog != null && restoreFailedDialog.isShowing()) {
             restoreFailedDialog.dismiss();
-
-        if (cloudRestoreFailedDialog != null && cloudRestoreFailedDialog.isShowing())
-            restoreFailedDialog.dismiss();
-
+        }
         super.onConfigurationChanged(newConfig);
     }
 
     // Static method to return File at localPath
     public static File getLocalPath() {
         return localPath;
-    }
-
-    // Static method to return File at backupPath
-    public static File getBackupPath() {
-        return backupPath;
     }
 
     @Override

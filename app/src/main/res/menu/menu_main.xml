@@ -13,29 +13,19 @@
         app:actionViewClass="android.support.v7.widget.SearchView"
         app:showAsAction="ifRoom|collapseActionView" />
 
-    <item android:id="@+id/action_cloud_backup"
-        android:title="@string/action_cloud_backup"
-        android:orderInCategory="101"
-        app:showAsAction="never" />
-
     <item android:id="@+id/action_backup"
         android:title="@string/action_backup"
-        android:orderInCategory="102"
-        app:showAsAction="never" />
-
-    <item android:id="@+id/action_cloud_restore"
-        android:title="@string/action_cloud_restore"
-        android:orderInCategory="103"
+        android:orderInCategory="101"
         app:showAsAction="never" />
 
     <item android:id="@+id/action_restore"
         android:title="@string/action_restore"
-        android:orderInCategory="104"
+        android:orderInCategory="102"
         app:showAsAction="never" />
 
     <item android:id="@+id/action_rate_app"
         android:title="@string/action_rate_app"
-        android:orderInCategory="105"
+        android:orderInCategory="103"
         app:showAsAction="never" />
 
 </menu>
