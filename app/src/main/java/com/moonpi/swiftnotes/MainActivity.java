@@ -1140,7 +1140,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         }
                         DriveId currentDriveId = result.getDriveFile().getDriveId();
                         Log.i(TAG, "Created a file with content: " + currentDriveId);
-                        showCloudBackupSuccessfulDialog();
                         trashOldFiles(currentDriveId, title);
                     }
                 });
