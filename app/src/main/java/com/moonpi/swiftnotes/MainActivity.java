@@ -314,7 +314,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        getCloudBackup();
+                        getCloudBackup(BACKUP_FILE_NAME);
                     }
                 })
                 .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
@@ -876,9 +876,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         Calls restoreBackup() on reply.
         Clusterfuck of nested callbacks.
      */
-    private void getCloudBackup() {
+    private void getCloudBackup(final String fileName) {
         Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, BACKUP_FILE_NAME))
+                .addFilter(Filters.eq(SearchableField.TITLE, fileName))
                 .build();
         Log.i(TAG, "Lets get cloud backup from Google Drive.");
         Drive.DriveApi.query(mGoogleApiClient, query)
