@@ -4,7 +4,6 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -12,7 +11,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -25,37 +23,16 @@ import android.widget.AdapterView;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
-import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
-import com.google.android.gms.drive.DriveContents;
-import com.google.android.gms.drive.DriveFile;
-import com.google.android.gms.drive.DriveFolder;
-import com.google.android.gms.drive.DriveId;
-import com.google.android.gms.drive.DriveResource;
-import com.google.android.gms.drive.Metadata;
-import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.Query;
-import com.google.android.gms.drive.query.SearchableField;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 
 import static com.moonpi.swiftnotes.DataUtils.BACKUP_FILE_NAME;
@@ -71,16 +48,12 @@ import static com.moonpi.swiftnotes.DataUtils.NOTE_REQUEST_CODE;
 import static com.moonpi.swiftnotes.DataUtils.NOTE_TITLE;
 import static com.moonpi.swiftnotes.DataUtils.retrieveData;
 
-public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener,
-        Toolbar.OnMenuItemClickListener, AbsListView.MultiChoiceModeListener,
-        SearchView.OnQueryTextListener, ConnectionCallbacks, OnConnectionFailedListener {
+public class MainActivity extends BaseDriveActivity implements
+        AdapterView.OnItemClickListener, Toolbar.OnMenuItemClickListener,
+        AbsListView.MultiChoiceModeListener, SearchView.OnQueryTextListener {
 
     private static final String TAG = "swiftnotes";
     private static File localPath;
-
-    // Google Drive stuff
-    private GoogleApiClient mGoogleApiClient;
-    private static final int REQUEST_CODE_RESOLUTION = 3;
     private static final String DRIVE_FILE_NAME = "swiftnotes_current.json";
 
     // Layout components
@@ -112,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         // Initialize local file path and backup file path
         localPath = new File(getFilesDir() + "/" + NOTES_FILE_NAME);
-
 
         if (Build.VERSION.SDK_INT >= 18) { // Android version >= 18 -> set orientation userPortrait
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
@@ -281,7 +253,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            saveDataToGDrive(notes, BACKUP_FILE_NAME);
+                            saveNotesToGDrive(notes, BACKUP_FILE_NAME);
                             // TODO: Check that this really happens
                         } else { // If notes array is empty -> toast backup no notes found
                             showToast(R.string.toast_backup_no_notes);
@@ -516,7 +488,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             // Attempt to save notes to local file
                             Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                            saveDataToGDrive(notes, DRIVE_FILE_NAME);
+                            saveNotesToGDrive(notes, DRIVE_FILE_NAME);
                             // TODO: Check that this really happens
 
                             // If save successful -> toast successfully deleted
@@ -713,7 +685,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     adapter.notifyDataSetChanged();
 
                     Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                    saveDataToGDrive(notes, DRIVE_FILE_NAME);
+                    saveNotesToGDrive(notes, DRIVE_FILE_NAME);
                     // TODO: Check that this really happens
 
                     if (saveSuccessful) {
@@ -749,7 +721,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         adapter.notifyDataSetChanged();
 
                         Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                        saveDataToGDrive(notes, DRIVE_FILE_NAME);
+                        saveNotesToGDrive(notes, DRIVE_FILE_NAME);
                         // TODO: Check that this really happens
 
                         if (saveSuccessful) {
@@ -863,43 +835,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
-    /*
-        Query GDrive for first file named swiftnotes_data.json.
-        Calls restoreBackup() on reply.
-        Clusterfuck of nested callbacks.
+    /**
+     * Get backup named fileName from GDrive.
+     * Calls restoreBackup() on received data.
+     * @param fileName name of backup
      */
     private void getCloudBackup(final String fileName) {
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, fileName))
-                .build();
         Log.i(TAG, "Lets get cloud backup from Google Drive.");
-        Drive.DriveApi.query(mGoogleApiClient, query)
-                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
-                    @Override
-                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
-                        if (!result.getStatus().isSuccess()) {
-                            // Error
-                            Log.e(TAG, "Could not access files on Google Drive.");
-                            return;
-                        }
-                        DriveId did = result.getMetadataBuffer().get(0).getDriveId();
-                        DriveFile driveFile = did.asDriveFile();
-                        driveFile.open(mGoogleApiClient, DriveFile.MODE_READ_ONLY, null)
-                                .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
-                            @Override
-                            public void onResult(@NonNull DriveApi.DriveContentsResult result) {
-                                if (!result.getStatus().isSuccess()) {
-                                    Log.e(TAG, "Could not open files on Google Drive.");
-                                    return;
-                                }
-                                Log.i(TAG, "Retrieved backup.");
-                                InputStreamReader isr = new InputStreamReader(
-                                        result.getDriveContents().getInputStream());
-                                restoreCloudData(retrieveData(isr));
-                            }
-                          });
-                    }
-                });
+        getFile(fileName, new ResultCallback<DriveApi.DriveContentsResult>() {
+            @Override
+            public void onResult(@NonNull DriveApi.DriveContentsResult result) {
+                if (!result.getStatus().isSuccess()) {
+                    Log.e(TAG, "Could not open files on Google Drive.");
+                    return;
+                }
+                Log.i(TAG, "Retrieved backup.");
+                InputStreamReader isr = new InputStreamReader(
+                        result.getDriveContents().getInputStream());
+                restoreCloudData(retrieveData(isr));
+            }
+        });
     }
 
     /*
@@ -933,7 +888,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
      * Wrap 'notes' array into a root object and store on Google Drive
      * @param notes Array of notes to be saved
      */
-    private void saveDataToGDrive(JSONArray notes, final String fileName) {
+    private void saveNotesToGDrive(JSONArray notes, final String fileName) {
         final JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -948,91 +903,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return;
         }
 
-        Drive.DriveApi.newDriveContents(mGoogleApiClient)
-                .setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
-                    @Override
-                    public void onResult(@NonNull DriveApi.DriveContentsResult result) {
-                        if (!result.getStatus().isSuccess()) {
-                            Log.i(TAG, "Failed to create new contents.");
-                            return;
-                        }
-                        Log.i(TAG, "New contents created.");
-                        final DriveContents driveContents = result.getDriveContents();
-                        uploadFile(driveContents, root.toString(), fileName,
-                                    "application/json");
-                    }
-                });
-    }
-
-
-    /*
-        Upload file to Google Drive with contents in str, title as title, mimetype as mimetype.
-     */
-    private void uploadFile(final DriveContents driveContents,
-                            final String str, final String title, final String mimetype) {
-        OutputStream outputStream = driveContents.getOutputStream();
-        Writer writer = new OutputStreamWriter(outputStream);
-        try {
-            writer.write(str);
-            writer.close();
-        } catch (IOException e) {
-            Log.e(TAG, e.getMessage());
-        }
-        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                .setTitle(title)
-                .setMimeType(mimetype)
-                .setStarred(false).build();
-
-        // Create a file on root folder
-        Drive.DriveApi.getRootFolder(mGoogleApiClient)
-                .createFile(mGoogleApiClient, changeSet, driveContents)
-                .setResultCallback(new ResultCallback<DriveFolder.DriveFileResult>() {
-                    @Override
-                    public void onResult(@NonNull DriveFolder.DriveFileResult result) {
-                        if (!result.getStatus().isSuccess()) {
-                            Log.i(TAG, "Error while trying to create the file");
-                            showToast(R.string.toast_backup_failed);
-                            return;
-                        }
-                        DriveId currentDriveId = result.getDriveFile().getDriveId();
-                        Log.i(TAG, "Created a file with content: " + currentDriveId);
-                        trashOldFiles(currentDriveId, title);
-                    }
-                });
-    }
-
-    /*
-    Trash old files matching filename, except given DriveId.
-    */
-    private void trashOldFiles(final DriveId currentDriveId, final String fileName) {
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, fileName))
-                .build();
-        Drive.DriveApi.query(mGoogleApiClient, query)
-                .setResultCallback(new ResultCallback<DriveApi.MetadataBufferResult>() {
-                    @Override
-                    public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
-                        // Trash all files except given DriveId
-                        for (Metadata md : result.getMetadataBuffer()) {
-                            DriveId did = md.getDriveId();
-                            if (!did.equals(currentDriveId)) {
-                                DriveResource driveResource = did.asDriveResource();
-                                if (!md.isTrashed()) {
-                                    driveResource.trash(mGoogleApiClient);
-                                }
-                            }
-                        }
-                        result.release();
-                        Log.i(TAG, "Trashed old files.");
-                    }
-                });
-    }
-
-    /**
-     * Shows a toast with the given message.
-     */
-    private void showToast(int id) {
-        Toast.makeText(this, id, Toast.LENGTH_SHORT).show();
+        uploadFile(root.toString(), fileName, "application/json");
     }
 
     /**
@@ -1069,64 +940,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     // Static method to return File at localPath
     public static File getLocalPath() {
         return localPath;
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (mGoogleApiClient == null) {
-            // Create the API client and bind it to an instance variable.
-            // We use this instance as the callback for connection and connection
-            // failures.
-            // Since no account name is passed, the user is prompted to choose.
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(Drive.API)
-                    .addScope(Drive.SCOPE_FILE)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .build();
-        }
-        // Connect the client. Once connected, onConnected() is called.
-        Log.i(TAG, "Connect GoogleApiClient");
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    protected void onPause() {
-        if (mGoogleApiClient != null) {
-            mGoogleApiClient.disconnect();
-        }
-        super.onPause();
-    }
-
-    @Override
-    public void onConnectionSuspended(int cause) {
-        Log.i(TAG, "GoogleApiClient connection suspended");
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult result) {
-        // Called whenever the API client fails to connect.
-        Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
-        if (!result.hasResolution()) {
-            // Show the localized error dialog.
-            GoogleApiAvailability.getInstance().getErrorDialog(this, result.getErrorCode(), 0).show();
-            return;
-        }
-        // The failure has a resolution. Resolve it.
-        // Called typically when the app is not yet authorized, and an
-        // authorization
-        // dialog is displayed to the user.
-        try {
-            result.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
-        } catch (IntentSender.SendIntentException e) {
-            Log.e(TAG, "Exception while starting resolution activity", e);
-        }
-    }
-
-    @Override
-    public void onConnected(Bundle connectionHint) {
-        Log.i(TAG, "API client connected.");
     }
 
 }
