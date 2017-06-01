@@ -66,20 +66,19 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Android version >= 18 -> set orientation fullUser
-        if (Build.VERSION.SDK_INT >= 18)
+        if (Build.VERSION.SDK_INT >= 18) { // Android version >= 18 -> set orientation fullUser
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
-
-        // Android version < 18 -> set orientation fullSensor
-        else
+        } else { // Android version < 18 -> set orientation fullSensor
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+        }
 
         // Initialize colours and font sizes arrays
         colourArr = getResources().getStringArray(R.array.colours);
 
         colourArrResId = new int[colourArr.length];
-        for (int i = 0; i < colourArr.length; i++)
+        for (int i = 0; i < colourArr.length; i++) {
             colourArrResId[i] = Color.parseColor(colourArr[i]);
+        }
 
         fontSizeArr = new int[] {14, 18, 22}; // 0 for small, 1 for medium, 2 for large
         fontSizeNameArr = getResources().getStringArray(R.array.fontSizeNames);
@@ -95,8 +94,9 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
 
         imm = (InputMethodManager) this.getSystemService(INPUT_METHOD_SERVICE);
 
-        if (toolbar != null)
+        if (toolbar != null) {
             initToolbar();
+        }
 
         // If scrollView touched and note body doesn't have focus -> request focus and go to body end
         scrollView.setOnTouchListener(new OnTouchListener() {
@@ -130,8 +130,9 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
                 bodyEdit.setText(bundle.getString(NOTE_BODY));
                 bodyEdit.setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize);
 
-                if (hideBody)
+                if (hideBody) {
                     menuHideBody.setTitle(R.string.action_show_body);
+                }
             }
 
             // If current note is new -> request keyboard focus to note title and show keyboard
@@ -175,8 +176,9 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
 
         Menu menu = toolbar.getMenu();
 
-        if (menu != null)
+        if (menu != null) {
             menuHideBody = menu.findItem(R.id.action_hide_show_body);
+        }
     }
 
 
@@ -200,8 +202,9 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
 
                 // Check which colour is it and equal to main colour
                 for (String aColour : colourArr)
-                    if (aColour.equals(selectedColourAsString))
+                    if (aColour.equals(selectedColourAsString)) {
                         colour = aColour;
+                    }
 
                 // Re-set background colour
                 relativeLayoutEdit.setBackgroundColor(Color.parseColor(colour));
@@ -237,11 +240,11 @@ public class EditActivity extends AppCompatActivity implements Toolbar.OnMenuIte
                     public void onClick(DialogInterface dialog, int which) {
                         // If 'Yes' clicked -> check if title is empty
                         // If title not empty -> save and go back; Otherwise toast
-                        if (!isEmpty(titleEdit) || !isEmpty(bodyEdit))
+                        if (!isEmpty(titleEdit) || !isEmpty(bodyEdit)) {
                             saveChanges();
-
-                        else
+                        } else {
                             toastEditTextCannotBeEmpty();
+                        }
                     }
                 })
                 .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {

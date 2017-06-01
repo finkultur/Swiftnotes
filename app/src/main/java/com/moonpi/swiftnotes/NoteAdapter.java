@@ -53,21 +53,21 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
     // Return number of notes
     @Override
     public int getCount() {
-        if (this.adapterData != null)
+        if (this.adapterData != null) {
             return this.adapterData.length();
-
-        else
+        } else {
             return 0;
+        }
     }
 
     // Return note at position
     @Override
     public JSONObject getItem(int position) {
-        if (this.adapterData != null)
+        if (this.adapterData != null) {
             return this.adapterData.optJSONObject(position);
-
-        else
+        } else {
             return null;
+        }
     }
 
     @Override
@@ -75,13 +75,13 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
         return 0;
     }
 
-
     // View inflater
     @Override
     public View getView(final int position, View convertView, ViewGroup parent) {
         // Inflate custom note view if null
-        if (convertView == null)
+        if (convertView == null) {
             convertView = this.inflater.inflate(R.layout.list_view_note, parent, false);
+        }
 
         // Initialize layout items
         RelativeLayout relativeLayout = (RelativeLayout) convertView.findViewById(R.id.relativeLayout);
@@ -109,12 +109,12 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
                 body = noteObject.getString(NOTE_BODY);
                 colour = noteObject.getString(NOTE_COLOUR);
 
-                if (noteObject.has(NOTE_FONT_SIZE))
+                if (noteObject.has(NOTE_FONT_SIZE)) {
                     fontSize = noteObject.getInt(NOTE_FONT_SIZE);
-
-                if (noteObject.has(NOTE_HIDE_BODY))
+                }
+                if (noteObject.has(NOTE_HIDE_BODY)) {
                     hideBody = noteObject.getBoolean(NOTE_HIDE_BODY);
-
+                }
                 favoured = noteObject.getBoolean(NOTE_FAVOURED);
 
             } catch (JSONException e) {
@@ -122,29 +122,26 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
             }
 
             // Set favourite image resource
-            if (favoured)
+            if (favoured) {
                 favourite.setImageResource(R.drawable.ic_fav);
-
-            else
+            } else {
                 favourite.setImageResource(R.drawable.ic_unfav);
-
+            }
 
             // If search or delete modes are active -> hide favourite button; Show otherwise
-            if (searchActive || deleteActive)
+            if (searchActive || deleteActive) {
                 favourite.setVisibility(View.INVISIBLE);
-
-            else
+            } else {
                 favourite.setVisibility(View.VISIBLE);
-
+            }
 
             titleView.setText(title);
 
             // If hidBody is true -> hide body of note
-            if (hideBody)
+            if (hideBody) {
                 bodyView.setVisibility(View.GONE);
-
-            // Else -> set visible note body, text to normal and set text size to 'fontSize' as sp
-            else {
+            } else {
+                // Else, set visible note body, text to normal and set text size to 'fontSize' as sp
                 bodyView.setVisibility(View.VISIBLE);
                 bodyView.setText(body);
                 bodyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize);
