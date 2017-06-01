@@ -113,12 +113,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Initialize local file path and backup file path
         localPath = new File(getFilesDir() + "/" + NOTES_FILE_NAME);
 
-        // Android version >= 18 -> set orientation userPortrait
-        if (Build.VERSION.SDK_INT >= 18)
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
 
-        // Android version < 18 -> set orientation sensorPortrait
-        else
+        if (Build.VERSION.SDK_INT >= 18) { // Android version >= 18 -> set orientation userPortrait
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+        } else // Android version < 18 -> set orientation sensorPortrait
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
 
         // Init notes array
@@ -128,8 +126,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         JSONArray tempNotes = DataUtils.retrieveData(localPath);
 
         // If not null -> equal main notes to retrieved notes
-        if (tempNotes != null)
+        if (tempNotes != null) {
             notes = tempNotes;
+        }
 
         setContentView(R.layout.activity_main);
 
@@ -139,8 +138,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         newNote = (ImageButton)findViewById(R.id.newNote);
         noNotes = (TextView)findViewById(R.id.noNotes);
 
-        if (toolbar != null)
+        if (toolbar != null) {
             initToolbar();
+        }
 
         newNoteButtonBaseYCoordinate = newNote.getY();
 
@@ -156,17 +156,16 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
                 // If last first visible item not initialized -> set to current first
-                if (lastFirstVisibleItem == -1)
+                if (lastFirstVisibleItem == -1) {
                     lastFirstVisibleItem = view.getFirstVisiblePosition();
-
+                }
                 // If scrolled up -> hide newNote button
-                if (view.getFirstVisiblePosition() > lastFirstVisibleItem)
+                if (view.getFirstVisiblePosition() > lastFirstVisibleItem) {
                     newNoteButtonVisibility(false);
-
+                }
                 // If scrolled down and delete/search not active -> show newNote button
                 else if (view.getFirstVisiblePosition() < lastFirstVisibleItem &&
                         !deleteActive && !searchActive) {
-
                     newNoteButtonVisibility(true);
                 }
 
@@ -193,11 +192,11 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         });
 
         // If no notes -> show 'Press + to add new note' text, invisible otherwise
-        if (notes.length() == 0)
+        if (notes.length() == 0) {
             noNotes.setVisibility(View.VISIBLE);
-
-        else
+        } else {
             noNotes.setVisibility(View.INVISIBLE);
+        }
 
         initDialogs(this);
     }
@@ -242,8 +241,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                             // Init realIndexes array
                             realIndexesOfSearchResults = new ArrayList<>();
-                            for (int i = 0; i < notes.length(); i++)
+                            for (int i = 0; i < notes.length(); i++) {
                                 realIndexesOfSearchResults.add(i);
+                            }
 
                             adapter.notifyDataSetChanged();
 
@@ -395,8 +395,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if (notes.getJSONObject(position).has(NOTE_HIDE_BODY)) {
                     intent.putExtra(NOTE_HIDE_BODY,
                             notes.getJSONObject(position).getBoolean(NOTE_HIDE_BODY));
-                } else
+                } else {
                     intent.putExtra(NOTE_HIDE_BODY, false);
+                }
 
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -438,7 +439,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                             try {
                                 startActivity(new Intent(Intent.ACTION_VIEW,
                                         Uri.parse("market://details?id=" + appPackageName)));
-
                             } catch (android.content.ActivityNotFoundException anfe) {
                                 startActivity(new Intent(Intent.ACTION_VIEW,
                                         Uri.parse("http://play.google.com/store/apps/details?id="
@@ -483,8 +483,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
 
             // If index was found -> remove the item
-            if (index != -1)
+            if (index != -1) {
                 checkedArray.remove(index);
+            }
         }
 
         // Set Toolbar title to 'x Selected'
@@ -614,7 +615,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 // Get note at position i
                 try {
                     note = notes.getJSONObject(i);
-
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -625,11 +625,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     try {
                         if (note.getString(NOTE_TITLE).toLowerCase().contains(s) ||
                             note.getString(NOTE_BODY).toLowerCase().contains(s)) {
-
                             notesFound.put(note);
                             realIndexesOfSearchResults.add(i);
                         }
-
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -644,13 +642,13 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // If query text length is 0 -> re-init realIndexes array (0 to length) and reset adapter
         else {
             realIndexesOfSearchResults = new ArrayList<>();
-            for (int i = 0; i < notes.length(); i++)
+            for (int i = 0; i < notes.length(); i++) {
                 realIndexesOfSearchResults.add(i);
+            }
 
             adapter = new NoteAdapter(getApplicationContext(), notes);
             listView.setAdapter(adapter);
         }
-
         return false;
     }
 
@@ -682,14 +680,15 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == RESULT_OK) {
             // If search was active -> call 'searchEnded' method
-            if (searchActive && searchMenu != null)
+            if (searchActive && searchMenu != null) {
                 searchMenu.collapseActionView();
+            }
 
             // Get extras
             Bundle mBundle = null;
-            if (data != null)
+            if (data != null) {
                 mBundle = data.getExtras();
-
+            }
             if (mBundle != null) {
                 // If new note was saved
                 if (requestCode == NEW_NOTE_REQUEST) {
@@ -706,7 +705,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                         newNoteObject.put(NOTE_HIDE_BODY, mBundle.getBoolean(NOTE_HIDE_BODY));
 
                         notes.put(newNoteObject);
-
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -725,9 +723,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     // If no notes -> show 'Press + to add new note' text, invisible otherwise
                     if (notes.length() == 0) {
                         noNotes.setVisibility(View.VISIBLE);
-                    }
-
-                    else {
+                    } else {
                         noNotes.setVisibility(View.INVISIBLE);
                     }
                 } else { // If existing note was updated (saved)
@@ -744,7 +740,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
                         // Update note at position 'requestCode'
                         notes.put(requestCode, newNoteObject);
-
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
@@ -776,7 +771,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 }
             }
         }
-
         super.onActivityResult(requestCode, resultCode, data);
     }
 
@@ -793,7 +787,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         // Get note at position and store in newFavourite
         try {
             newFavourite = notes.getJSONObject(position);
-
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -811,7 +804,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 // Sort notes array so favoured note is first
                 if (position > 0) {
                     JSONArray newArray = new JSONArray();
-
                     try {
                         newArray.put(0, newFavourite);
                     } catch (JSONException e) {
