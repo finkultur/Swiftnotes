@@ -1,15 +1,15 @@
 # Swiftnotes
 
-This project is no longer maintained.
+This is a fork of Adrian Chifors Swiftnotes. I simply added some Google Drive integration.
+And random note colors! Your life is now complete!
 
-[Swiftnotes](https://play.google.com/store/apps/details?id=com.moonpi.swiftnotes) is a note taking app that takes simplicity and speed to a whole new level. 
-
-It offers you a quick and easy way to stay organised, capture your thoughts, reminders or anything that's on your mind, any time, anywhere. No extra unnecessary features, just notes. For screenshots and more information visit the [Google PlayStore.](https://play.google.com/store/apps/details?id=com.moonpi.swiftnotes)
+Check out the original project at https://github.com/adrianchifor/Swiftnotes.
+It is also on the Google PlayStore: [Swiftnotes](https://play.google.com/store/apps/details?id=com.moonpi.swiftnotes)
 
 ### Build
 
 Steps on how to build Swiftnotes:
-- Make sure you have the latest version of Android Studio with Gradle v2.3.1 and the required Android SDK Tools installed (25.0.3 Build tools)
+- Make sure you have the latest version of Android Studio with Gradle v2.3.2 and the required Android SDK Tools installed (25.0.3 Build tools)
 - Clone this repository
 - Open Android Studio -> File -> Import Project
 - Select build.gradle in Swiftnotes
