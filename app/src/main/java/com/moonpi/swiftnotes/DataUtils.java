@@ -40,7 +40,7 @@ class DataUtils {
     static final String NOTES_ARRAY_NAME = "notes"; // Root object name
 
     static final String BACKUP_FOLDER_PATH = "/Swiftnotes"; // Backup folder path
-    static final String BACKUP_FILE_NAME = "swiftnotes_backup.json"; // Backup file name
+    static final String BACKUP_FILE_NAME = "swiftnotes_Backup.json"; // Backup file name
 
     // Note data constants used in intents and in key-value store
     static final int NEW_NOTE_REQUEST = 60000;

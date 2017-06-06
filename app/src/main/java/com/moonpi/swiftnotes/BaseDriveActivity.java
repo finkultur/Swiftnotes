@@ -20,6 +20,7 @@ import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.DriveResource;
 import com.google.android.gms.drive.Metadata;
 import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.android.gms.drive.query.Filter;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.drive.query.SearchableField;
@@ -27,6 +28,7 @@ import com.google.android.gms.drive.query.SearchableField;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Arrays;
 
 
 public abstract class BaseDriveActivity extends AppCompatActivity
@@ -56,12 +58,23 @@ public abstract class BaseDriveActivity extends AppCompatActivity
                             Log.e(TAG, "Could not access files on Google Drive.");
                             return;
                         }
-                        DriveId did = result.getMetadataBuffer().get(0).getDriveId();
-                        DriveFile driveFile = did.asDriveFile();
-                        driveFile.open(getGoogleApiClient(), DriveFile.MODE_READ_ONLY, null)
-                                .setResultCallback(resultCallback);
+                        DriveId driveId = result.getMetadataBuffer().get(0).getDriveId();
+                        getFile(driveId, resultCallback);
+                        result.release();
                     }
                 });
+    }
+
+    /**
+     * Open file at Google Drive.
+     * @param driveId DriveId of file
+     * @param resultCallback Callback function on result.
+     */
+    public void getFile(DriveId driveId,
+                        final ResultCallback<DriveApi.DriveContentsResult> resultCallback) {
+        DriveFile driveFile = driveId.asDriveFile();
+        driveFile.open(getGoogleApiClient(), DriveFile.MODE_READ_ONLY, null)
+                .setResultCallback(resultCallback);
     }
 
     /**
@@ -71,7 +84,8 @@ public abstract class BaseDriveActivity extends AppCompatActivity
      * @param fileName Name of file
      * @param mimetype MIME-type of file
      */
-    public void uploadFile(final String str, final String fileName, final String mimetype) {
+    public void uploadFile(final String str, final String fileName, final String mimetype,
+                           final boolean trashOld) {
         final MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
                 .setTitle(fileName)
                 .setMimeType(mimetype)
@@ -109,7 +123,9 @@ public abstract class BaseDriveActivity extends AppCompatActivity
                                         }
                                         DriveId currentDriveId = result.getDriveFile().getDriveId();
                                         Log.i(TAG, "Created a file with content: " + currentDriveId);
-                                        trashOldFiles(currentDriveId, fileName);
+                                        if (trashOld) {
+                                            trashOldFiles(currentDriveId, fileName);
+                                        }
                                     }
                                 });
                     }
@@ -143,6 +159,24 @@ public abstract class BaseDriveActivity extends AppCompatActivity
                         Log.i(TAG, "Trashed old files.");
                     }
                 });
+    }
+
+    /**
+        Queries Google Drive for all json-files with titles specified in fileNames.
+     */
+    public void getAllBackups(ResultCallback<DriveApi.MetadataBufferResult> resultCallback,
+                              String... fileNames) {
+        Filter[] filters = new Filter[fileNames.length];
+        for (int i=0; i<fileNames.length; i++) {
+            filters[i] = Filters.eq(SearchableField.TITLE, fileNames[i]);
+        }
+
+        Query query = new Query.Builder().addFilter(Filters.and(
+                Filters.eq(SearchableField.MIME_TYPE, "application/json"),
+                Filters.or(Arrays.asList(filters))))
+                .build();
+
+        Drive.DriveApi.query(mGoogleApiClient, query).setResultCallback(resultCallback);
     }
 
     /**

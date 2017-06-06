@@ -10,6 +10,7 @@
     <!-- -->
     <string name="yes_button">Yes</string>
     <string name="no_button">No</string>
+    <string name="cancel_button">Cancel</string>
     <!-- -->
     <string-array name="colourNames">
         <item>Blue</item>
@@ -54,6 +55,7 @@
     <string name="dialog_gdrive_check_restore_if_sure">Are you sure you want to restore notes from
         Google Drive</string>
     <string name="dialog_gdrive_restore_failed">Something went wrong.</string>
+    <string name="dialog_restore_multi">Pick a backup</string>
     <!-- -->
     <string name="new_note_content_description">New note</string>
     <string name="favourite_content_description">Favourite</string>

@@ -26,6 +26,8 @@ import android.widget.TextView;
 
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.Metadata;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -33,6 +35,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import static com.moonpi.swiftnotes.DataUtils.BACKUP_FILE_NAME;
@@ -54,7 +57,7 @@ public class MainActivity extends BaseDriveActivity implements
 
     private static final String TAG = "swiftnotes";
     private static File localPath;
-    private static final String DRIVE_FILE_NAME = "swiftnotes_current.json";
+    private static final String AUTOSAVE_FILE_NAME = "swiftnotes_Autosave.json";
 
     // Layout components
     private static ListView listView;
@@ -149,7 +152,6 @@ public class MainActivity extends BaseDriveActivity implements
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount,
                                  int totalItemCount) {}
         });
-
 
         // If newNote button clicked -> Start EditActivity intent with NEW_NOTE_REQUEST as request
         newNote.setOnClickListener(new View.OnClickListener() {
@@ -253,7 +255,7 @@ public class MainActivity extends BaseDriveActivity implements
                     public void onClick(DialogInterface dialog, int which) {
                         // If note array not empty -> continue
                         if (notes.length() > 0) {
-                            saveNotesToGDrive(notes, BACKUP_FILE_NAME);
+                            saveNotesToGDrive(notes, BACKUP_FILE_NAME, false);
                             // TODO: Check that this really happens
                         } else { // If notes array is empty -> toast backup no notes found
                             showToast(R.string.toast_backup_no_notes);
@@ -286,7 +288,7 @@ public class MainActivity extends BaseDriveActivity implements
                 .setPositiveButton(R.string.yes_button, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        getCloudBackup(BACKUP_FILE_NAME);
+                        pollForBackups();
                     }
                 })
                 .setNegativeButton(R.string.no_button, new DialogInterface.OnClickListener() {
@@ -308,6 +310,7 @@ public class MainActivity extends BaseDriveActivity implements
                     }
                 })
                 .create();
+
     }
 
     // Method to dismiss backup check and show backup successful dialog
@@ -321,6 +324,8 @@ public class MainActivity extends BaseDriveActivity implements
         restoreCheckDialog.dismiss();
         restoreFailedDialog.show();
     }
+
+
 
     /**
      * If item clicked in list view -> Start EditActivity intent with position as requestCode
@@ -394,7 +399,8 @@ public class MainActivity extends BaseDriveActivity implements
             backupCheckDialog.show();
             return true;
         } else if (id == R.id.action_restore) {
-            restoreCheckDialog.show();
+            pollForBackups();
+            //restoreCheckDialog.show();
         }
 
         // 'Rate app' pressed -> create new dialog to ask the user if he wants to go to the PlayStore
@@ -488,7 +494,7 @@ public class MainActivity extends BaseDriveActivity implements
 
                             // Attempt to save notes to local file
                             Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                            saveNotesToGDrive(notes, DRIVE_FILE_NAME);
+                            saveNotesToGDrive(notes, AUTOSAVE_FILE_NAME, false);
                             // TODO: Check that this really happens
 
                             // If save successful -> toast successfully deleted
@@ -549,7 +555,6 @@ public class MainActivity extends BaseDriveActivity implements
         return false;
     }
 
-
     /**
      * Method to show and hide the newNote button
      * @param isVisible true to show button, false to hide
@@ -563,7 +568,6 @@ public class MainActivity extends BaseDriveActivity implements
             newNote.animate().translationY(newNoteButtonBaseYCoordinate + 500);
         }
     }
-
 
     /**
      * Callback method for 'searchView' menu item widget text change
@@ -685,7 +689,7 @@ public class MainActivity extends BaseDriveActivity implements
                     adapter.notifyDataSetChanged();
 
                     Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                    saveNotesToGDrive(notes, DRIVE_FILE_NAME);
+                    saveNotesToGDrive(notes, AUTOSAVE_FILE_NAME, true);
                     // TODO: Check that this really happens
 
                     if (saveSuccessful) {
@@ -721,7 +725,7 @@ public class MainActivity extends BaseDriveActivity implements
                         adapter.notifyDataSetChanged();
 
                         Boolean saveSuccessful = DataUtils.saveData(localPath, notes);
-                        saveNotesToGDrive(notes, DRIVE_FILE_NAME);
+                        saveNotesToGDrive(notes, AUTOSAVE_FILE_NAME, true);
                         // TODO: Check that this really happens
 
                         if (saveSuccessful) {
@@ -836,13 +840,13 @@ public class MainActivity extends BaseDriveActivity implements
     }
 
     /**
-     * Get backup named fileName from GDrive.
-     * Calls restoreBackup() on received data.
-     * @param fileName name of backup
+     * Get and restore backup from Google Drive.
+     * Calls restoreCloudData() on received data.
+     * @param driveId name of backup
      */
-    private void getCloudBackup(final String fileName) {
+    private void getCloudBackup(final DriveId driveId) {
         Log.i(TAG, "Lets get cloud backup from Google Drive.");
-        getFile(fileName, new ResultCallback<DriveApi.DriveContentsResult>() {
+        getFile(driveId, new ResultCallback<DriveApi.DriveContentsResult>() {
             @Override
             public void onResult(@NonNull DriveApi.DriveContentsResult result) {
                 if (!result.getStatus().isSuccess()) {
@@ -888,7 +892,7 @@ public class MainActivity extends BaseDriveActivity implements
      * Wrap 'notes' array into a root object and store on Google Drive
      * @param notes Array of notes to be saved
      */
-    private void saveNotesToGDrive(JSONArray notes, final String fileName) {
+    private void saveNotesToGDrive(JSONArray notes, final String fileName, final boolean trashOld) {
         final JSONObject root = new JSONObject();
 
         // If passed notes not null -> wrap in root JSONObject
@@ -903,7 +907,66 @@ public class MainActivity extends BaseDriveActivity implements
             return;
         }
 
-        uploadFile(root.toString(), fileName, "application/json");
+        uploadFile(root.toString(), fileName, "application/json", trashOld);
+    }
+
+    private void pollForBackups() {
+        getAllBackups(new ResultCallback<DriveApi.MetadataBufferResult>() {
+            @Override
+            public void onResult(@NonNull DriveApi.MetadataBufferResult result) {
+                Log.i(TAG, result.toString());
+                ArrayList<Backup> backups = new ArrayList<>(2);
+                for (Metadata md : result.getMetadataBuffer()) {
+                    backups.add(new Backup(md.getTitle(), md.getDriveId(), md.getModifiedDate()));
+                }
+                chooseBackupToRestore(backups);
+                result.release();
+            }
+        }, AUTOSAVE_FILE_NAME, BACKUP_FILE_NAME);
+    }
+
+    private void chooseBackupToRestore(final ArrayList<Backup> backups) {
+        String[] options = new String[backups.size() > 0 ? backups.size() : 1];
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, HH:mm"); // Jul 4, 13:37
+
+        options[0] = "No backups found.";
+        for (int i=0; i<backups.size(); i++) {
+            options[i] = backups.get(i).getTitle()
+                    .replaceFirst("swiftnotes_", "")
+                    .replaceFirst(".json", "")
+                    + " - "
+                    + sdf.format(backups.get(i).getDate());
+        }
+
+        // Create and show dialog to display backup options
+        AlertDialog restoreMultipleDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_restore_multi)
+                .setItems(options, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (backups.size() == 0) {
+                            dialog.dismiss();
+                            return;
+                        }
+                        DriveId did = backups.get(which).getDriveId();
+                        getCloudBackup(did);
+                    }
+                })
+                .setNegativeButton(R.string.cancel_button, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .show();
+    }
+
+    @Override
+    public void onConnected(Bundle connectionHint) {
+        if (notes.length() == 0) {
+            pollForBackups();
+        }
+        super.onConnected(connectionHint);
     }
 
     /**
