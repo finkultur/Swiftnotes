@@ -37,7 +37,7 @@
         android:layout_alignRight="@+id/titleView"
         android:layout_alignEnd="@+id/titleView"
         android:textAppearance="?android:attr/textAppearanceMedium"
-        android:maxLines="5"
+        android:maxLines="6"
         android:textColor="@color/black_95"
         android:paddingBottom="8dp" />
 

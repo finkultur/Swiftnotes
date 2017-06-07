@@ -121,6 +121,13 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
                 e.printStackTrace();
             }
 
+            // Put "..." on bottom if body > maxLines
+            int numLines = body.length() - body.replaceAll("\n", "").length();
+            if (numLines >= bodyView.getMaxLines()) {
+                int where = ordinalIndexOf(body, "\n", bodyView.getMaxLines()-2);
+                body = body.substring(0, where) + "\n...\n" + body.substring(where);
+            }
+
             // Set favourite image resource
             if (favoured) {
                 favourite.setImageResource(R.drawable.ic_fav);
@@ -173,5 +180,23 @@ class NoteAdapter extends BaseAdapter implements ListAdapter {
         }
 
         return convertView;
+    }
+
+    /**
+     * Finds the n:th index of searchStr in str.
+     * @param str String to search
+     * @param searchStr Seach string to find
+     * @param n n:th occurence
+     * @return the n:th index of searchStr in str
+     */
+    public int ordinalIndexOf(String str, String searchStr, int n) {
+        if (str == null) {
+            return -1;
+        }
+        int pos = -1;
+        for (int i=0; i <= n; i++) {
+            pos = str.indexOf(searchStr, pos+1);
+        }
+        return pos;
     }
 }
